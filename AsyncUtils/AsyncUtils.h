@@ -76,14 +76,18 @@ namespace base{
 	public:
 		enum Status{
 			WORKING=1,
-			FINISH =2
+			FINISH =2,
+			UNSTART=3,
+			STOP
 		};
 		BackLogicBase(HWND win);
 		virtual ~BackLogicBase(void);
 		virtual void start();
 		virtual void close();
+		virtual void stop();
 		virtual Status  getStatus();
 		virtual CAtlString getLastError();
+		virtual void UpdateLastError(const CAtlString& v);
 		void* Query(LPCTSTR pClass)
 		{
 			if(0==_tcscmp(pClass,_T("BackLogicBase")))
@@ -92,12 +96,17 @@ namespace base{
 		}
 	private:
 		static DWORD WINAPI ThreadProc(LPVOID p1);
+		void UpdateStatus(BackLogicBase::Status v);
 	protected:
 		virtual void Run() = 0;
 	protected:
 		HWND	m_win;
 		HANDLE	m_thread;
+		HANDLE  m_quit;
+		HANDLE  m_run;
 		CAtlString m_error;
+		CLock   m_lockStatus;
+		CLock   m_lockError;
 		volatile Status m_curStats;
 	};
 	/*--------------------------------------------------------------------------*/

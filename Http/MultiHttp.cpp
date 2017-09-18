@@ -24,9 +24,10 @@ int sockpair(SOCKET *fds,int nNum,int nStart)
 	int nbind=0;
 	do 
 	{
+		nBindPort++;
 		inaddr.sin_family = AF_INET;
 		inaddr.sin_addr.s_addr = ::htonl(INADDR_LOOPBACK);
-		inaddr.sin_port = htons(nBindPort++);
+		inaddr.sin_port = htons(nBindPort);
 		nbind = ::bind(fds[1],(struct sockaddr *)&inaddr,sizeof(inaddr));
 	}while(nbind==SOCKET_ERROR);
 	return nBindPort;
@@ -96,6 +97,10 @@ namespace curl
 	}
 	CMultiHttp::~CMultiHttp()
 	{
+		Clear();
+	}
+	void CMultiHttp::Clear()
+	{
 		if( m_hThread )
 		{
 			::CloseHandle(m_hThread);
@@ -104,6 +109,7 @@ namespace curl
 		//释放curl资源
 		if( m_murl )
 		{
+			//有的机器上运行出错
 			for(size_t nI=0;nI < m_lstUrl.size();nI++)
 			{
 				curl_multi_remove_handle(m_murl,m_lstUrl[nI]);
@@ -115,6 +121,19 @@ namespace curl
 		}
 		closesocket(m_fds[0]);
 		closesocket(m_fds[1]);
+	}
+	void CMultiHttp::DelUrl(curl::CHttpClient* client)
+	{
+		if( m_murl && client && client->GetCURL())
+		{
+			std::vector<CURL*>::iterator it = std::find(m_lstUrl.begin(),m_lstUrl.end(),client->GetCURL());
+			if(it!=m_lstUrl.end())
+			{
+				curl_multi_remove_handle(m_murl,*it);
+				curl_multi_cleanup(*it);
+				m_lstUrl.erase(it);
+			}
+		}
 	}
 	void CMultiHttp::AddUrl(curl::CHttpClient* client)
 	{
@@ -129,6 +148,7 @@ namespace curl
 		if( m_state==CMultiHttp::Initialize )
 		{
 			::ResumeThread(m_hThread);
+			m_state = CMultiHttp::Running;
 			return true;
 		}
 		if( m_state==CMultiHttp::Running )
@@ -166,24 +186,22 @@ namespace curl
 	{
 		bool ncode=0;
 		DWORD dwCode=3;
-		if( m_hThread )
+		if( m_hThread && m_state!=CMultiHttp::Running )
 		{
-			::GetExitCodeThread(m_hThread,&dwCode);
-			if( dwCode==STILL_ACTIVE )
-			{
-				m_hThread=NULL;
-				return true;
-			}
-		}
-		else
+			::CloseHandle(m_hThread);
+			m_hThread = NULL;
+			m_state = CMultiHttp::Terminate;
 			return true;
-		if( m_murl && m_fds[1] && m_state==CMultiHttp::Running )
+		}
+		if(m_murl && m_fds[1] && m_state==CMultiHttp::Running )
 		{
 			//重试三次
 			dwCode=3;
 			do 
 			{
-				if(!sendcmd(m_fds[0],CMD_CANCEL,sizeof(CMD_CANCEL),m_cmdPort))
+				std::string userCmd;
+				userCmd += CMD_CANCEL;
+				if(!sendcmd(m_fds[0],(char*)userCmd.c_str(),userCmd.size(),m_cmdPort))
 				{
 					dwCode--;
 					::Sleep(100);

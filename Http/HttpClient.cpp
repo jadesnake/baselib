@@ -281,15 +281,8 @@ namespace curl {
 		curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, 10);		//链接超时
 		if (m_headerlist)
 			curl_easy_setopt(m_url, CURLOPT_HTTPHEADER, m_headerlist);
-		if (!m_params.empty()) {
-			std::string encode = encodeParam();
-			curl_easy_setopt(m_url, CURLOPT_POSTFIELDSIZE, encode.length());
-			curl_easy_setopt(m_url, CURLOPT_COPYPOSTFIELDS,encode.c_str());
-		}
 		if(!m_agent.IsEmpty())
 			curl_easy_setopt(m_url, CURLOPT_USERAGENT, (char*)CT2CA(m_agent, CP_UTF8));
-		else
-			curl_easy_setopt(m_url, CURLOPT_USERAGENT, "Mozilla / 5.0");
 		
 		curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 100);	//超时单位秒
 		curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
@@ -328,24 +321,14 @@ namespace curl {
 			curl_off_t nLen = (curl_off_t)m_rbuf.tellp();
 			curl_easy_setopt(m_url, CURLOPT_READFUNCTION, StreamUpdate);
 			curl_easy_setopt(m_url, CURLOPT_READDATA, (void*)&m_rbuf);
-			/*
-			curl_easy_setopt(m_url, CURLOPT_INFILESIZE, nLen);
-			curl_easy_setopt(m_url, CURLOPT_INFILESIZE_LARGE, nLen);
-			curl_easy_setopt(m_url, CURLOPT_PUT, 1L);
-			curl_easy_setopt(m_url, CURLOPT_UPLOAD, 1L);
-			*/
 		}
 		if (m_tgProxy.nType != Proxy::NONE)
 		{
 			curl_easy_setopt(m_url, CURLOPT_PROXYTYPE, m_tgProxy.nType);
 			curl_easy_setopt(m_url, CURLOPT_PROXYPORT, m_tgProxy.nPort);
-			curl_easy_setopt(m_url, CURLOPT_PROXY_SERVICE_NAME, (char*)CT2CA(m_tgProxy.strServer));
+			//curl_easy_setopt(m_url, CURLOPT_PROXY_SERVICE_NAME, (char*)CT2CA(m_tgProxy.strServer));
 			curl_easy_setopt(m_url, CURLOPT_PROXYUSERNAME, (char*)CT2CA(m_tgProxy.strName));
 			curl_easy_setopt(m_url, CURLOPT_PROXYUSERPWD, (char*)CT2CA(m_tgProxy.strPass));
-		}
-		if (m_postBoundary)
-		{
-			curl_easy_setopt(m_url, CURLOPT_HTTPPOST, m_postBoundary);
 		}
 		if (m_bWriteHeader) {
 			curl_easy_setopt(m_url, CURLOPT_HEADERDATA, (void*)&m_headbuf);
@@ -357,7 +340,6 @@ namespace curl {
 		curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
 #endif
 		m_header.clear();
-		m_params.clear();
 	}
 	void	CHttpClient::EnableDecode(bool bDecode) 
 	{
@@ -367,11 +349,38 @@ namespace curl {
 	{
 		PerformParam((char*)CT2CA(url));		
 	}
-	std::string	CHttpClient::RequestPost(const CAtlString& url)
+	std::string CHttpClient::RequestGet(const CAtlString& url,bool perform)
 	{
-		return RequestPost((char*)CT2CA(url));
+		return RequestGet((char*)CT2CA(url),perform);
 	}
-	std::string CHttpClient::RequestPost(const std::string& url) 
+	std::string CHttpClient::RequestGet(const std::string& url,bool perform)
+	{
+		CURLcode code;
+		if (m_url)
+		{
+			std::string rqFull(url);
+			std::string rqParams = encodeParam();
+			if(!rqParams.empty())
+			{
+				rqFull += "?";
+				rqFull += rqParams;
+			}
+			PerformParam(rqFull);
+			curl_easy_setopt(m_url, CURLOPT_POST, 0L);			
+			curl_easy_setopt(m_url, CURLOPT_HTTPGET, 1L);
+			curl_easy_setopt(m_url, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
+			m_params.clear();
+			if(perform)
+				code = curl_easy_perform(m_url);
+		}
+		return GetStream();
+	}
+
+	std::string	CHttpClient::RequestPost(const CAtlString& url,bool perform)
+	{
+		return RequestPost((char*)CT2CA(url),perform);
+	}
+	std::string CHttpClient::RequestPost(const std::string& url,bool perform) 
 	{
 		CURLcode code;
 		if (m_url)
@@ -379,10 +388,23 @@ namespace curl {
 			PerformParam(url);
 			curl_easy_setopt(m_url, CURLOPT_POST, 1L);
 			curl_easy_setopt(m_url, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
-			if (m_rbuf.tellp() && m_params.empty()) {
+			if (!m_params.empty())
+			{
+				std::string encode = encodeParam();
+				curl_easy_setopt(m_url, CURLOPT_POSTFIELDSIZE, encode.length());
+				curl_easy_setopt(m_url, CURLOPT_COPYPOSTFIELDS,encode.c_str());
+			}
+			else if (m_rbuf.tellp())
+			{
 				curl_easy_setopt(m_url, CURLOPT_POSTFIELDSIZE, m_rbuf.tellp());
 			}
-			code = curl_easy_perform(m_url);
+			if (m_postBoundary)
+			{
+				curl_easy_setopt(m_url, CURLOPT_HTTPPOST, m_postBoundary);
+			}
+			m_params.clear();
+			if(perform)
+				code = curl_easy_perform(m_url);
 		}
 		return GetStream();
 	}

@@ -26,11 +26,13 @@ namespace curl
 		const static int CmdPortStart = 8181;
 		CMultiHttp();
 		virtual ~CMultiHttp();
-		void	AddUrl(curl::CHttpClient* client);
+		void AddUrl(curl::CHttpClient* client);
+		void DelUrl(curl::CHttpClient* client);
 		virtual bool	Cancel();
 		virtual bool	Start();
 		virtual bool	Run();
 		virtual void    PostCmd(const char *,UserCmd *cmd);
+		virtual void	Clear();
 	protected:
 		virtual bool	OneComplete(CURL* url,CURLcode code);
 		virtual void    OnUserCmd(const char *,UserCmd *cmd);

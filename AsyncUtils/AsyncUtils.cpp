@@ -67,57 +67,96 @@ namespace base
 	BackLogicBase::BackLogicBase(HWND win)
 	{
 		m_thread = NULL;
+		m_quit = NULL;
+		m_run  = NULL;
 		m_win    = win;
+		m_curStats = UNSTART;
 		Back2Front::Get()->pushStack(this);
 	}
 	BackLogicBase::~BackLogicBase(void)
 	{
-
+		if(m_quit)
+		{
+			::CloseHandle(m_quit);
+			m_quit = NULL;
+		}
+		if(m_run)
+		{
+			::CloseHandle(m_run);
+			m_run = NULL;
+		}
 	}
 	void BackLogicBase::start()
 	{
 		if(m_thread==NULL)
 		{
-			m_curStats = WORKING;
+			m_quit = ::CreateEvent(NULL,FALSE,FALSE,NULL);
+			m_run = ::CreateEvent(NULL,FALSE,FALSE,NULL);
 			m_thread = ::CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)&BackLogicBase::ThreadProc,this,0,NULL);
+		}
+		::SetEvent(m_run);
+	}
+	void BackLogicBase::stop()
+	{
+		if(m_thread)
+		{
+			::ResetEvent(m_run);
+			UpdateStatus(STOP);
 		}
 	}
 	void BackLogicBase::close()
 	{
 		if (m_thread) 
 		{
-			::WaitForSingleObject(m_thread, 2000);
+			::ResetEvent(m_run);
+			::SetEvent(m_quit);		//½áÊøºóÌ¨
+			::WaitForSingleObject(m_thread,3000);
 			::CloseHandle(m_thread);
+			UpdateStatus(FINISH);
 			m_thread = NULL;
 		}
 	}
 	BackLogicBase::Status  BackLogicBase::getStatus()
 	{
-		DWORD dwCode = 0;
-		if( m_curStats == FINISH ){
-			return FINISH;
-		}	
-		if(m_thread){
-			::GetExitCodeThread(m_thread,&dwCode);
-			if( dwCode==STILL_ACTIVE ){
-				return WORKING;
-			}
-		}
-		return FINISH;
+		BackLogicBase::Status ret;
+		CLockGuard lock(&m_lockStatus);
+		ret = m_curStats;
+		return ret;
+	}
+	void BackLogicBase::UpdateStatus(BackLogicBase::Status v)
+	{
+		CLockGuard lock(&m_lockStatus);
+		m_curStats = v;
 	}
 	CAtlString BackLogicBase::getLastError()
 	{
-		if( WORKING==getStatus() )
-			return NULL;
-		return m_error;
+		CAtlString ret;
+		CLockGuard lock(&m_lockError);
+		ret = m_error;
+		return ret;
+	}
+	void BackLogicBase::UpdateLastError(const CAtlString& v)
+	{
+		CLockGuard lock(&m_lockError);
+		m_error = v;
 	}
 	DWORD BackLogicBase::ThreadProc(LPVOID p1)
 	{
 		BackLogicBase *pT = reinterpret_cast<BackLogicBase*>(p1);
-		pT->Run();
-		pT->m_curStats = FINISH;
-		if(pT->m_win)
-			Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
-		return 0xdead;
+		HANDLE events[10]={pT->m_quit,pT->m_run};
+		while(1)
+		{
+			DWORD dwWait = WaitForMultipleObjects(2,events,FALSE,INFINITE);
+			if(dwWait==WAIT_OBJECT_0)
+			{
+				pT->UpdateStatus(FINISH);
+				return 0xdead;
+			}
+			pT->UpdateStatus(WORKING);
+			pT->Run();
+			pT->UpdateStatus(STOP);
+			if(pT->m_win)
+				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
+		}
 	}
 }

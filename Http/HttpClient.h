@@ -6,9 +6,9 @@
 //#define CURL_STATICLIB
 #include "curl/curl.h"
 #if defined(_DEBUG)
-#pragma comment(lib,"libcurld.lib")
+#pragma comment(lib,"libcurl-mdd.lib")
 #else
-#pragma comment(lib,"libcurl.lib")
+#pragma comment(lib,"libcurl-md.lib")
 #endif
 #pragma comment(lib,"Wldap32.lib")
 #pragma comment(lib,"Ws2_32.lib")
@@ -74,8 +74,12 @@ namespace curl
 		void	BodySaveFile(FILE *f);
 		void	SetCookie(const std::string &val);
 		//
-		std::string	RequestPost(const CAtlString& url);
-		std::string RequestPost(const std::string& url);
+		std::string	RequestPost(const CAtlString& url,bool perform=true);
+		std::string RequestPost(const std::string& url,bool perform=true);
+
+		std::string RequestGet(const CAtlString& url,bool perform=true);
+		std::string RequestGet(const std::string& url,bool perform=true);
+
 		std::string GetStream();
 		std::string GetHeader();
 		//
