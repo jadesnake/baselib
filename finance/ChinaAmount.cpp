@@ -6,10 +6,15 @@ namespace base
 	bool ChinaAmount::CapitalRMB(const CAtlString &inRmb,CAtlString &out)
 	{
 		static TCHAR CAPITAL_NUM[]=_T("零壹贰叁肆伍陆柒捌玖");
-		static TCHAR CAPITAL_UNIT[]=_T("分角元拾佰仟万亿");
+		//static TCHAR CAPITAL_UNIT[]=_T("分角元拾佰仟万亿");
+		
+		static TCHAR radices[] = _T(" 拾佰仟");
+		static TCHAR bigRadices[] = _T(" 万亿");
+		static TCHAR decimals[] = _T("分角");
 
 		CAtlString integer;	//整数部分
 		CAtlString decimal;	//小数部分
+		bool fu = false;
 		int dot = inRmb.ReverseFind('.');
 		if(inRmb.IsEmpty())
 			return false;
@@ -22,8 +27,14 @@ namespace base
 			integer = inRmb.Mid(0,dot);
 			decimal = inRmb.Mid(dot+1);
 		}
+		if( integer[0]==_T('-') )
+		{
+			fu = true;
+		}
 		//去掉整数部分的人民币标识符
 		integer.Remove('￥');
+		integer.Remove(_T('-'));
+		integer.Remove(_T('+'));
 		//超出转换范围
 		if(decimal.GetLength()>2)
 			return false;
@@ -47,28 +58,41 @@ namespace base
 			int price = decimal[nNum] - _T('0');
 			if(price==0)	continue;	//跳过0
 			TCHAR capital = CAPITAL_NUM[price];
-			TCHAR unit = CAPITAL_UNIT[nUnit];
+			TCHAR unit = decimals[nUnit];
 			tmp2 += capital;
 			tmp2 += unit;
 		}
+		long quotient=0,modulus=0;
+		long zeroCount = 0;
 		for(int nNum=0,nUnit=2;nNum<integer.GetLength();nNum++)
 		{
-			CAtlString tmp;
-			int price = integer[integer.GetLength()-nNum-1] - _T('0');
-			if(price==0)	continue;	//跳过0
-			TCHAR capital = CAPITAL_NUM[price];
-			TCHAR unit;
-			if(nNum<=5)		//亿单位
-				unit = CAPITAL_UNIT[nUnit+nNum];
+			long p = integer.GetLength() - nNum - 1; 
+			CAtlString d = integer.Mid(nNum, 1); 
+			quotient = p / 4; 
+			modulus  = p % 4; 
+			if(d == _T("0"))
+			{ 
+				zeroCount++; 
+			} 
 			else
-			{	//超出亿表示范围
-				int nU = nNum-5;
-				unit = CAPITAL_UNIT[nUnit+nU];
-			}
-			tmp += capital;
-			tmp += unit;
-			tmp1.Insert(0,tmp);
+			{ 
+				if (zeroCount > 0) 
+				{ 
+					tmp1 += CAPITAL_NUM[0]; 
+				} 
+				zeroCount = 0; 
+				tmp1 += CAPITAL_NUM[ _ttoi(d) ];
+				tmp1 += radices[modulus]; 
+			} 
+			if (modulus==0 && zeroCount < 4) 
+			{ 
+				tmp1 += bigRadices[quotient]; 
+				zeroCount = 0; 
+			} 			
 		}
+		tmp1 = tmp1.Trim();
+		if(fu)
+			tmp1.Insert(0,_T("（负数）"));
 		if( tmp1[tmp1.GetLength()-1]!=_T('元') )
 			tmp1 += _T("元");
 		tmp2 += _T("整");

@@ -3,6 +3,8 @@
 
 #include "stdafx.h"
 #include "calendar.h"
+#include <sys/timeb.h>
+#include <atlcomtime.h>
 
 namespace base
 {
@@ -104,6 +106,14 @@ namespace base
 		*this= canlendarTmp;
 		return true;
 	}
+	time_t Calendar::CurrentTimeLarge()
+	{
+		long long time_last;    
+		time_last = time(NULL);     //总秒数  
+		struct __timeb64 t1;    
+		_ftime(&t1);
+		return (t1.time * 1000 + t1.millitm);
+	}
 	bool Calendar::PlusMonth(int v)
 	{
 		int nY = 0;	//翻的年数
@@ -131,5 +141,15 @@ namespace base
 		base::Calendar canlendarTmp(GetYear()+nY,nSelV,GetDay(),GetHour(),GetMinute(),GetSecond());
 		*this = canlendarTmp;
 		return true;
+	}
+	bool Calendar::ParseDateTime(LPCTSTR lpszDate)
+	{
+		COleDateTime oleDt;
+		if( oleDt.ParseDateTime(lpszDate) )
+		{
+			(*this) = ATL::CTime(oleDt.m_dt);
+			return true;
+		}
+		return false;
 	}
 }

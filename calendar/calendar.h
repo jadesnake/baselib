@@ -22,6 +22,9 @@ namespace base{
 		Calendar& operator=( const Calendar& time);
 		bool PlusYear(int v);
 		bool PlusMonth(int v);
+		//获取当前时间精确到毫秒
+		static time_t CurrentTimeLarge();
+		bool ParseDateTime(LPCTSTR lpszDate);
 	public:
 		//获取当前月天数
 		int GetMonthDays();
