@@ -111,6 +111,7 @@ namespace curl {
 		,m_bWriteHeader(false)
 		,m_Save2File(NULL)
 		,m_bDecodeBody(false)
+		,m_bEncodeUrl(true)
 	{
 		m_tmOut = 10000;
 		m_tgProxy.nType = Proxy::NONE;
@@ -240,7 +241,10 @@ namespace curl {
 	{
 		m_params.insert(std::make_pair(szName, szValue));
 	}
-
+	void	CHttpClient::SetEncodeUrl(bool e)
+	{
+		m_bEncodeUrl = e;
+	}
 	void	CHttpClient::BodySaveFile(FILE *f) 
 	{
 		m_Save2File = f;
@@ -443,8 +447,13 @@ namespace curl {
 		{
 			std::string strVal;
 			if (!itPos->first.empty() && !itPos->second.empty()) {
-				char *key = curl_easy_escape(m_url,itPos->first.c_str(), itPos->first.length());
-				char *val = curl_easy_escape(m_url,itPos->second.c_str(),itPos->second.length());
+				char *key = NULL;
+				char *val = NULL;
+				if(m_bEncodeUrl)
+				{
+					key = curl_easy_escape(m_url,itPos->first.c_str(), itPos->first.length());
+					val = curl_easy_escape(m_url,itPos->second.c_str(),itPos->second.length());
+				}
 				if (key) {
 					ret.append(key);
 					curl_free(key);

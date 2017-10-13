@@ -6,9 +6,9 @@
 //#define CURL_STATICLIB
 #include "curl/curl.h"
 #if defined(_DEBUG)
-#pragma comment(lib,"libcurl-mdd.lib")
+#pragma comment(lib,"libcurld.lib")
 #else
-#pragma comment(lib,"libcurl-md.lib")
+#pragma comment(lib,"libcurl.lib")
 #endif
 #pragma comment(lib,"Wldap32.lib")
 #pragma comment(lib,"Ws2_32.lib")
@@ -88,6 +88,7 @@ namespace curl
 		static void GlobalClean();
 		static long PerformUrl(CURL* url);
 		std::string EncodeUrl(const std::string &v);
+		void		SetEncodeUrl(bool e);
 	protected:
 		std::string encodeParam();
 	protected:
@@ -97,6 +98,7 @@ namespace curl
 		Proxy		m_tgProxy;
 		mapStrings	m_header;
 		mapStrings  m_params;
+		bool		m_bEncodeUrl;
 
 		std::stringstream	m_wbuf;
 		std::stringstream	m_rbuf;

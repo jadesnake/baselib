@@ -146,6 +146,7 @@ namespace base
 		HANDLE events[10]={pT->m_quit,pT->m_run};
 		while(1)
 		{
+			bool bPost=false;
 			DWORD dwWait = WaitForMultipleObjects(2,events,FALSE,INFINITE);
 			if(dwWait==WAIT_OBJECT_0)
 			{
@@ -153,9 +154,9 @@ namespace base
 				return 0xdead;
 			}
 			pT->UpdateStatus(WORKING);
-			pT->Run();
+			bPost = pT->Run();
 			pT->UpdateStatus(STOP);
-			if(pT->m_win)
+			if( bPost && pT->m_win)
 				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
 		}
 	}

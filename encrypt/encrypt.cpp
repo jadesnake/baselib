@@ -65,15 +65,19 @@ void AesEncode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey)
 void AesDecode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey)
 {
 	WinAES	wA;
-	byte	chOut[2024];
-	size_t  nOutlen = sizeof(chOut);
+	byte	*chOut=NULL;
+	std::string binData = base::decode64(strIn.GetString());
+	size_t  nOutlen = binData.size()*3;
+	chOut = new byte[nOutlen];
+
 	memset(chOut,0,sizeof(chOut));
 	//decodeHex(strIn.GetString(),strIn.GetLength(),strOut);
-	std::string binData = base::decode64(strIn.GetString());
 	wA.SetKey((byte*)strKey.GetString(),strKey.GetLength());
 	wA.Decrypt((byte*)binData.c_str(),binData.size(),chOut,nOutlen);
 	strOut.Empty();
 	strOut.Append((const char*)chOut,nOutlen);
+
+	delete []chOut;
 }
 
 DWORD  GetHash(BYTE *pbData, DWORD dwDataLen, ALG_ID algId,CAtlStringA &out)

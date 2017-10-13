@@ -98,7 +98,7 @@ namespace base{
 		static DWORD WINAPI ThreadProc(LPVOID p1);
 		void UpdateStatus(BackLogicBase::Status v);
 	protected:
-		virtual void Run() = 0;
+		virtual bool Run() = 0;
 	protected:
 		HWND	m_win;
 		HANDLE	m_thread;
