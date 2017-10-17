@@ -28,12 +28,17 @@ namespace base
 
  bool IsRunningOnVistaOrHigher();
 
- bool OpenResource(const wchar_t *resource,
-						   const wchar_t *type,
-						   void *&data,
-						   unsigned long &size,
-						   HMODULE module = NULL);
+ bool OpenResource(const wchar_t *resource,const wchar_t *type,
+		void *&data,unsigned long &size,HMODULE module = NULL);
+ //获取适配器1 mac
+ bool GetMacAddressByNetBIOS(std::string &mac_address);
+ //获取适配器1 mac
+ void GetMacAddress(std::string &mac);
+
+ std::string AllocGuidA();
 
 } 
+
+
 
 #endif // BASE_WIN32_WIN_UTIL_H_
