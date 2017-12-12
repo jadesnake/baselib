@@ -108,7 +108,7 @@ namespace curl {
 		,m_headerlist(NULL)
 		,m_postBoundary(NULL)
 		,m_lastBoundary(NULL)
-		,m_bWriteHeader(false)
+		,m_bWriteHeader(true)
 		,m_Save2File(NULL)
 		,m_bDecodeBody(false)
 		,m_bEncodeUrl(true)
@@ -282,6 +282,11 @@ namespace curl {
 			//curl_free(ret);
 			curl_easy_setopt(m_url, CURLOPT_URL, url.c_str());
 		}
+		if( std::string::npos!=url.find("https") )
+		{
+			curl_easy_setopt(m_url,CURLOPT_SSL_VERIFYPEER,false);
+			curl_easy_setopt(m_url,CURLOPT_SSL_VERIFYHOST,false);
+		}
 		curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, 10);		//链接超时
 		if (m_headerlist)
 			curl_easy_setopt(m_url, CURLOPT_HTTPHEADER, m_headerlist);
@@ -302,7 +307,6 @@ namespace curl {
 			curl_easy_setopt(m_url, CURLOPT_HTTP_CONTENT_DECODING, 0L);
 			curl_easy_setopt(m_url, CURLOPT_HTTP_TRANSFER_DECODING,0L);
 		}
-
 		//curl_easy_setopt(m_url, CURLOPT_COOKIESESSION, 1L);
 		//curl_easy_setopt(m_url, CURLOPT_COOKIEFILE, "curl.cookie");
 		//curl_easy_setopt(m_url, CURLOPT_ACCEPT_ENCODING, "zh-CN,zh;q=0.8");
@@ -411,6 +415,99 @@ namespace curl {
 				code = curl_easy_perform(m_url);
 		}
 		return GetStream();
+	}
+	long		CHttpClient::ReqeustCode()
+	{
+		if(m_url==NULL)
+			return -1;
+		long code = 0;
+		if( CURLE_OK==curl_easy_getinfo(m_url, CURLINFO_RESPONSE_CODE, &code) )
+			return code;
+		return -1;
+	}
+	bool CHttpClient::IsResponseChunk()
+	{
+		bool chunked = false;
+		char line[512];
+		while(m_headbuf.getline(line,sizeof(line)))
+		{
+			if(0==strcmp(strlwr(line),"transfer-encoding: chunked\r"))
+			{
+				chunked = true;
+				break;
+			}
+		}
+		return chunked;
+	}
+	void readChuckFromStream(std::stringstream &ss,std::string &out,int nlen)
+	{
+		char line[128];
+		int npos = 0;	//块数
+		int nys = 0;	//余数
+		int buflen = 0;
+		if(nlen<sizeof(line))
+		{
+			npos = 1;
+			nys =0;
+			buflen = nlen;
+		}
+		else
+		{
+			buflen = sizeof(line);
+			npos = nlen/sizeof(line);
+			nys = nlen-npos*sizeof(line);
+		}
+		out.clear();
+		for(int n=0;n<npos;n++)
+		{
+			memset(line,0,sizeof(line));
+			if(ss.read(line,buflen))
+				out.append(line,buflen);
+		}
+		memset(line,0,sizeof(line));
+		if(nys)
+		{
+			if(ss.read(line,nys))
+				out.append(line,nys);
+		}
+	}
+	std::vector<std::string> CHttpClient::GetChunks()
+	{
+		std::vector<std::string>  ret;
+		if(!IsResponseChunk())
+		{
+			ret.push_back(GetStream());			
+			return ret;
+		}
+		bool error = false;
+		long nChuck = -1;
+		char line[512];
+		while(!m_wbuf.eof())
+		{
+			memset(line,0,sizeof(line));
+			if( !m_wbuf.getline(line,sizeof(line)) )
+			{
+				error = true;
+				break;
+			}
+			sscanf(line, "%x", &nChuck);
+			if(nChuck==0)
+				break;
+			std::string elem;
+			readChuckFromStream(m_wbuf,elem,nChuck);
+			memset(line,0,sizeof(line));
+			ret.push_back(elem);
+			//读取两个字符判断当前chuck末尾
+			line[0] = m_wbuf.peek();
+			if(line[0]=='\r')
+				m_wbuf.seekg(2,std::ios::cur);		
+		}
+		if(error)
+		{
+			ret.push_back(GetStream());			
+			return ret;
+		}
+		return ret;
 	}
 	std::string	CHttpClient::GetStream()
 	{

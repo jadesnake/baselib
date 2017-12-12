@@ -5,11 +5,6 @@
 
 //#define CURL_STATICLIB
 #include "curl/curl.h"
-#if defined(_DEBUG)
-#pragma comment(lib,"libcurld.lib")
-#else
-#pragma comment(lib,"libcurl.lib")
-#endif
 #pragma comment(lib,"Wldap32.lib")
 #pragma comment(lib,"Ws2_32.lib")
 
@@ -80,8 +75,11 @@ namespace curl
 		std::string RequestGet(const CAtlString& url,bool perform=true);
 		std::string RequestGet(const std::string& url,bool perform=true);
 
+		bool IsResponseChunk();
+
 		std::string GetStream();
 		std::string GetHeader();
+		std::vector<std::string> GetChunks();
 		//
 		void		EnableDecode(bool bDecode);
 		static void GlobalSetup();
@@ -89,6 +87,7 @@ namespace curl
 		static long PerformUrl(CURL* url);
 		std::string EncodeUrl(const std::string &v);
 		void		SetEncodeUrl(bool e);
+		long		ReqeustCode();
 	protected:
 		std::string encodeParam();
 	protected:
