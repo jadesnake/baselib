@@ -47,9 +47,24 @@ public:
     BCMath(long long num) : value() { std::stringstream ss; ss << num; value = ss.str(); }
     BCMath(unsigned int num) : value() { std::stringstream ss; ss << num; value = ss.str(); }
     BCMath(unsigned long long num) : value() { std::stringstream ss; ss << num; value = ss.str(); }
-    BCMath(float num) : value() { std::stringstream ss; ss << num; value = ss.str(); }
-    BCMath(double num) : value() { std::stringstream ss; ss << num; value = ss.str(); }
-    BCMath(long double num) { std::stringstream ss; ss << num; value = ss.str(); }
+    BCMath(float num) : value() { 
+		std::stringstream ss;
+		ss.precision(30);
+		ss <<std::fixed<<num; //std::fixed可将科学计数法转成正常
+		value = ss.str();
+	}
+    BCMath(double num) : value() { 
+		std::stringstream ss; 
+		ss.precision(30);
+		ss <<std::fixed<<num; //std::fixed可将科学计数法转成正常
+		value = ss.str();
+	}
+    BCMath(long double num) {
+		std::stringstream ss; 
+		ss.precision(35);
+		ss <<std::fixed<<num; //std::fixed可将科学计数法转成正常
+		value = ss.str();
+	}
 
     BCMath operator+(const BCMath& o) {
         return BCMath::bcadd(value, o.value);
@@ -106,6 +121,9 @@ public:
     bool operator <= (const BCMath& o) {
         return BCMath::bccomp(value, o.value)<=0;
     }
+	bool operator != (const BCMath& o) {
+		return BCMath::bccomp(value, o.value)!=0;
+	}
 
     int toInt() {
         std::istringstream buffer(value);
