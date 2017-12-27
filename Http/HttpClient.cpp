@@ -127,6 +127,10 @@ namespace curl {
 	}
 	CHttpClient::~CHttpClient()
 	{
+		ClearAll();
+	}
+	void	CHttpClient::ClearAll()
+	{
 		if( m_url )
 		{
 			curl_easy_cleanup(m_url);
@@ -139,6 +143,7 @@ namespace curl {
 		}
 		ClearBoundary();
 		m_header.clear();
+		m_params.clear();
 	}
 	void	CHttpClient::SetTimeout(long out)
 	{
@@ -347,7 +352,6 @@ namespace curl {
 		curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
 		curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
 #endif
-		m_header.clear();
 	}
 	void	CHttpClient::EnableDecode(bool bDecode) 
 	{
@@ -357,11 +361,11 @@ namespace curl {
 	{
 		PerformParam((char*)CT2CA(url));		
 	}
-	std::string CHttpClient::RequestGet(const CAtlString& url,bool perform)
+	std::string CHttpClient::RequestGet(const CAtlString& url,bool cHeader,bool cParam,bool perform)
 	{
 		return RequestGet((char*)CT2CA(url),perform);
 	}
-	std::string CHttpClient::RequestGet(const std::string& url,bool perform)
+	std::string CHttpClient::RequestGet(const std::string& url,bool cHeader,bool cParam,bool perform)
 	{
 		CURLcode code;
 		if (m_url)
@@ -377,18 +381,21 @@ namespace curl {
 			curl_easy_setopt(m_url, CURLOPT_POST, 0L);			
 			curl_easy_setopt(m_url, CURLOPT_HTTPGET, 1L);
 			curl_easy_setopt(m_url, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
-			m_params.clear();
+			if(cParam)
+				m_params.clear();
+			if(cHeader)
+				m_header.clear();
 			if(perform)
 				code = curl_easy_perform(m_url);
 		}
 		return GetStream();
 	}
 
-	std::string	CHttpClient::RequestPost(const CAtlString& url,bool perform)
+	std::string	CHttpClient::RequestPost(const CAtlString& url,bool cHeader,bool cParam,bool perform)
 	{
-		return RequestPost((char*)CT2CA(url),perform);
+		return RequestPost((char*)CT2CA(url),perform,cHeader,cParam);
 	}
-	std::string CHttpClient::RequestPost(const std::string& url,bool perform) 
+	std::string CHttpClient::RequestPost(const std::string& url,bool cHeader,bool cParam,bool perform) 
 	{
 		CURLcode code;
 		if (m_url)
@@ -410,7 +417,10 @@ namespace curl {
 			{
 				curl_easy_setopt(m_url, CURLOPT_HTTPPOST, m_postBoundary);
 			}
-			m_params.clear();
+			if(cParam)
+				m_params.clear();
+			if(cHeader)
+				m_header.clear();
 			if(perform)
 				code = curl_easy_perform(m_url);
 		}
@@ -512,6 +522,8 @@ namespace curl {
 	std::string	CHttpClient::GetStream()
 	{
 		std::string strRet("");
+		if(200!=ReqeustCode())
+			return strRet;	//·Ç200·µ»Ø¿Õ
 		if( m_wbuf.tellp() < 0 ) 
 			return strRet;
 		return m_wbuf.str();
@@ -522,6 +534,16 @@ namespace curl {
 		if (m_headbuf.tellp() < 0)
 			return strRet;
 		return m_headbuf.str();
+	}
+	std::string CHttpClient::DecodeUrl(const std::string &v)
+	{
+		std::string ret;
+		char *result = curl_easy_unescape(m_url, v.c_str(), v.length(),0);
+		if (result) {
+			ret = result;
+			curl_free(result);
+		}
+		return ret;
 	}
 	std::string CHttpClient::EncodeUrl(const std::string &v) 
 	{

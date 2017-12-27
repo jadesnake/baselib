@@ -69,11 +69,11 @@ namespace curl
 		void	BodySaveFile(FILE *f);
 		void	SetCookie(const std::string &val);
 		//
-		std::string	RequestPost(const CAtlString& url,bool perform=true);
-		std::string RequestPost(const std::string& url,bool perform=true);
+		std::string	RequestPost(const CAtlString& url,bool cHeader=true,bool cParam=true,bool perform=true);
+		std::string RequestPost(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
 
-		std::string RequestGet(const CAtlString& url,bool perform=true);
-		std::string RequestGet(const std::string& url,bool perform=true);
+		std::string RequestGet(const CAtlString& url,bool cHeader=true,bool cParam=true,bool perform=true);
+		std::string RequestGet(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
 
 		bool IsResponseChunk();
 
@@ -86,8 +86,10 @@ namespace curl
 		static void GlobalClean();
 		static long PerformUrl(CURL* url);
 		std::string EncodeUrl(const std::string &v);
+		std::string DecodeUrl(const std::string &v);
 		void		SetEncodeUrl(bool e);
 		long		ReqeustCode();
+		void		ClearAll();
 	protected:
 		std::string encodeParam();
 	protected:
