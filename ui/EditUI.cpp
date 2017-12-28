@@ -15,15 +15,15 @@ namespace CustomUI
 	}
 	void EditUI::Init()
 	{
-		if( IsPasswordMode() )
+		if((__super::GetWinStyle()&ES_PASSWORD)==ES_PASSWORD)
 		{
-			SetPasswordChar(_T('¡ñ'));
+			m_pTwh->SetPasswordChar(L'¡ñ');
 		}
-		DuiLib::CEditUI::DoInit();
+		__super::DoInit();
 	}
 	void EditUI::DoEvent(DuiLib::TEventUI& event)
 	{
-		if( event.Type == UIEVENT_KILLFOCUS )
+		if( event.Type == DuiLib::UIEVENT_KILLFOCUS )
 		{
 			if( IsEnabled() ) 
 			{
@@ -36,7 +36,7 @@ namespace CustomUI
 				this->Invalidate();
 			}
 		}
-		if( event.Type == UIEVENT_SETFOCUS )
+		if( event.Type == DuiLib::UIEVENT_SETFOCUS )
 		{
 			if( IsEnabled() )
 			{
@@ -51,7 +51,7 @@ namespace CustomUI
 	{
 		if( ((m_uButtonState & UISTATE_FOCUSED) != 0) && m_dwFocusBorderColor )
 		{
-			CRenderEngine::DrawRect(hDC,m_rcItem,m_nBorderSize,
+			DuiLib::CRenderEngine::DrawRect(hDC,m_rcItem,m_nBorderSize,
 									GetAdjustColor(m_dwFocusBorderColor));
 			return ;
 		}
@@ -64,7 +64,7 @@ namespace CustomUI
 			__super::PaintText(hDC);
 			return ;
 		}
-		if( !m_bkText.IsEmpty() && m_needbktext )
+		if( !m_bkText.IsEmpty() && m_needbktext && 0==__super::GetTextLength() )
 		{
 			if( m_bkTextColor == 0 )
 				m_bkTextColor = m_pManager->GetDefaultDisabledColor();
@@ -73,7 +73,7 @@ namespace CustomUI
 			rc.right  -= m_bkTextPadding.right;
 			rc.top    += m_bkTextPadding.top;
 			rc.bottom -= m_bkTextPadding.bottom;
-			CRenderEngine::DrawText(hDC, m_pManager, rc, m_bkText, m_bkTextColor, \
+			DuiLib::CRenderEngine::DrawText(hDC, m_pManager, rc, m_bkText, m_bkTextColor, \
 									m_bkFont, DT_SINGLELINE | m_bkTextStyle);
 		}
 	}
@@ -95,8 +95,9 @@ namespace CustomUI
 	}
 	void EditUI::SetText(LPCTSTR pstrValue)
 	{
-		DuiLib::CEditUI::SetText(pstrValue);
-		m_needbktext = true;
+		__super::SetText(pstrValue);
+		if( GetTextLength() )
+			m_needbktext = true;
 		this->Invalidate();
 	}
 	void EditUI::SetBkText(LPCTSTR pstrValue)

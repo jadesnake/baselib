@@ -3,7 +3,7 @@
 #include "../base/MacroX.h"
 namespace CustomUI
 {
-	class EditUI : public DuiLib::CEditUI 
+	class EditUI : public DuiLib::CRichEditUI 
 	{
 	public:
 		EditUI(void);
@@ -15,7 +15,7 @@ namespace CustomUI
 		void SetText(LPCTSTR pstrValue);
 		void SetBkText(LPCTSTR pstrValue);
 		virtual void Init();
-		DUI_DECLARE(CustomUI::EditUI,DuiLib::CEditUI)
+		DUI_DECLARE(CustomUI::EditUI,DuiLib::CRichEditUI)
 	protected:
 		void DoEvent(DuiLib::TEventUI& event);
 		void PaintText(HDC hDC);
