@@ -3,9 +3,10 @@
 #include "ButtonUI.h"
 #include "EditUI.h"
 #include "ListExUI.h"
-#include "CalendarUI.h"
 #include "MultipleText.h"
 #include "ScannerEdit.h"
+#include "OptionUI.h"
+#include "TemplateClick.h"
 namespace CustomUI
 {
 	template<class T>
@@ -31,6 +32,36 @@ namespace CustomUI
 		{
 			return new CustomUI::ScannerEditUI();
 		}
+		if(_tcscmp(pstrClass,_T("CustomUI::OptionUI"))==0)
+		{
+			return new CustomUI::OptionUI();
+		}
+		if(_tcscmp(pstrClass,_T("CustomUI::TextUI"))==0)
+		{
+			return new TemplateClick<DuiLib::CTextUI>();
+		}
 		return base->CreateControl(pstrClass);
 	}
+	//ÊôÐÔ½Ó¿Ú
+	template<class DuiWinBase>
+	class WinBaseResT : public DuiWinBase
+	{
+	protected:
+		DuiLib::CDuiString GetSkinFolder()
+		{
+			return DuiWinBase::GetSkinFolder();
+		}
+		DuiLib::UILIB_RESOURCETYPE GetResourceType() const
+		{
+			return DuiWinBase::GetResourceType();
+		}
+		LPCTSTR	GetResourceID() const
+		{
+			return DuiWinBase::GetResourceID();
+		}
+		DuiLib::CControlUI* CreateControl(LPCTSTR pstrClass)
+		{
+			return CreateCustomUI(pstrClass,static_cast<DuiWinBase*>(this));
+		}
+	};
 }
