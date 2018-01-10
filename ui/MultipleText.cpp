@@ -54,15 +54,15 @@ namespace CustomUI
 	{
 		m_bLink = bV;
 	}
-	void MultipleText::DoEvent(TEventUI& event)
+	void MultipleText::DoEvent(DuiLib::TEventUI& event)
 	{
-		if( event.Type == UIEVENT_MOUSEENTER )
+		if( event.Type == DuiLib::UIEVENT_MOUSEENTER )
 		{
 			m_unState |= UISTATE_HOT;
 			Invalidate();
 			return ;
 		}
-		if( event.Type == UIEVENT_MOUSELEAVE )
+		if( event.Type == DuiLib::UIEVENT_MOUSELEAVE )
 		{
 			m_unState &= ~UISTATE_HOT;
 			if( m_bLink && m_cursortmp )
@@ -70,7 +70,7 @@ namespace CustomUI
 			Invalidate();
 			return ;
 		}
-		if( event.Type == UIEVENT_MOUSEMOVE && m_bLink )
+		if( event.Type == DuiLib::UIEVENT_MOUSEMOVE && m_bLink )
 		{
 			if( ((m_unState&UISTATE_HOT) == UISTATE_HOT) && 
 				::PtInRect(&m_rcText,event.ptMouse)	&& IsEnabled()
@@ -81,7 +81,7 @@ namespace CustomUI
 				return ;
 			}
 		}
-		if( event.Type == UIEVENT_BUTTONUP && m_bLink && IsEnabled() )
+		if( event.Type == DuiLib::UIEVENT_BUTTONUP && m_bLink && IsEnabled() )
 		{
 			if( ::PtInRect(&m_rcText,event.ptMouse) )
 			{
@@ -91,7 +91,7 @@ namespace CustomUI
 			}
 			return ;
 		}
-		if( event.Type == UIEVENT_BUTTONDOWN && m_bLink && IsEnabled() )
+		if( event.Type == DuiLib::UIEVENT_BUTTONDOWN && m_bLink && IsEnabled() )
 		{
 			if( ::PtInRect(&m_rcText,event.ptMouse) )
 			{
@@ -211,7 +211,7 @@ namespace CustomUI
 				{
 					if( (m_unState&UISTATE_HOT)==UISTATE_HOT )
 					{
-						TFontInfo *info = m_pManager->GetFontInfo(GetFont());
+						DuiLib::TFontInfo *info = m_pManager->GetFontInfo(GetFont());
 						nFont = m_pManager->GetFontIndex(info->sFontName,info->iSize,info->bBold,
 							true,info->bItalic);
 						if( nFont == -1 )

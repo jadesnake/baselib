@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MacroX.h"
 namespace CustomUI
 {
 	class MultipleText : public DuiLib::CTextUI
@@ -11,7 +12,7 @@ namespace CustomUI
 		
 		void SetLink(bool bV);
 		void SetAttribute(LPCTSTR pstrName, LPCTSTR pstrValue);
-		void DoEvent(TEventUI& event);
+		void DoEvent(DuiLib::TEventUI& event);
 		bool Activate();
 		SIZE EstimateSize(SIZE szAvailable);
 		RECT GetTextRc();

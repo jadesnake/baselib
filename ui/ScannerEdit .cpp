@@ -17,7 +17,7 @@ namespace CustomUI{
 	}
 	void ScannerEditUI::DoEvent(DuiLib::TEventUI& event)
 	{
-		if( event.Type == UIEVENT_KILLFOCUS )
+		if( event.Type == DuiLib::UIEVENT_KILLFOCUS )
 		{
 			if( IsEnabled() ) 
 			{
@@ -33,7 +33,7 @@ namespace CustomUI{
 					OnLostFocus(this);
 			}
 		}
-		if( event.Type == UIEVENT_SETFOCUS )
+		if( event.Type == DuiLib::UIEVENT_SETFOCUS )
 		{
 			if( IsEnabled() )
 			{
@@ -51,7 +51,7 @@ namespace CustomUI{
 	{
 		if( ((m_uButtonState & UISTATE_FOCUSED) != 0) && m_dwFocusBorderColor )
 		{
-			CRenderEngine::DrawRect(hDC,m_rcItem,m_nBorderSize,
+			DuiLib::CRenderEngine::DrawRect(hDC,m_rcItem,m_nBorderSize,
 				GetAdjustColor(m_dwFocusBorderColor));
 			return ;
 		}
@@ -73,7 +73,7 @@ namespace CustomUI{
 			rc.right  -= m_bkTextPadding.right;
 			rc.top    += m_bkTextPadding.top;
 			rc.bottom -= m_bkTextPadding.bottom;
-			CRenderEngine::DrawText(hDC, m_pManager, rc, m_bkText, m_bkTextColor, \
+			DuiLib::CRenderEngine::DrawText(hDC, m_pManager, rc, m_bkText, m_bkTextColor, \
 				m_bkFont, DT_SINGLELINE | m_bkTextStyle);
 		}
 	}
@@ -194,7 +194,7 @@ namespace CustomUI{
 	bool ScannerEditUI::OnScanInput(void *param)
 	{
 		DuiLib::TEventUI *event = static_cast<DuiLib::TEventUI*>(param);
-		if(event->Type==UIEVENT_CHAR)
+		if(event->Type== DuiLib::UIEVENT_CHAR)
 		{
 			if( event->chKey>='0' && event->chKey<='9' )
 				return true;
@@ -251,7 +251,7 @@ namespace CustomUI{
 			bool bInput = true;
 			{
 				DuiLib::TEventUI ev;
-				ev.Type = UIEVENT_CHAR;			
+				ev.Type = DuiLib::UIEVENT_CHAR;			
 				ev.chKey = (TCHAR)wparam;
 				ev.lParam = lparam;
 				ev.wParam = wparam;
