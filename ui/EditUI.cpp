@@ -213,11 +213,6 @@ namespace CustomUI
 				if(pT->OnInputEvent)
 					pT->OnInputEvent(pT);
 			}
-			if(wparam==VK_RETURN&&!pT->IsMultiLine())
-			{
-				//单行发出
-				pT->GetManager()->SendNotify(const_cast<EditUI*>(this),DUI_MSGTYPE_RETURN);
-			}
 			return hr;
 		}
 		return __super::TxSendMessage(msg,wparam,lparam,plresult);
