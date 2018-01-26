@@ -292,6 +292,17 @@ CAtlString GetAppPath()
 	CAtlString filename(CAtlString(sDrive) + CAtlString(sDir));
 	return filename;
 }
+CAtlString getAppFilePath()
+{
+	TCHAR sFilename[_MAX_PATH];
+	TCHAR sDrive[_MAX_DRIVE];
+	TCHAR sDir[_MAX_DIR];
+	TCHAR sFname[_MAX_FNAME];
+	TCHAR sExt[_MAX_EXT];
+	//GetModuleFileName( GetModuleHandle(NULL), sFilename, _MAX_PATH);
+	GetModuleFileName( NULL, sFilename, _MAX_PATH);
+	return (CAtlString)sFilename;
+}
 //判断文件或者目录是否存在
 BOOL IsPathFind( const CAtlString& strPath )
 {

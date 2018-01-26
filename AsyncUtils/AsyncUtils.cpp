@@ -104,6 +104,14 @@ namespace base
 			UpdateStatus(STOP);
 		}
 	}
+	void BackLogicBase::quit()
+	{
+		if(m_thread)
+		{
+			::SetEvent(m_quit);
+			UpdateStatus(STOP);
+		}
+	}
 	void BackLogicBase::close()
 	{
 		if (m_thread) 
@@ -144,9 +152,10 @@ namespace base
 	{
 		BackLogicBase *pT = reinterpret_cast<BackLogicBase*>(p1);
 		HANDLE events[10]={pT->m_quit,pT->m_run};
+		bool bQuit =false;
+		bool bPost =false;
 		while(1)
 		{
-			bool bPost=false;
 			DWORD dwWait = WaitForMultipleObjects(2,events,FALSE,INFINITE);
 			if(dwWait==WAIT_OBJECT_0)
 			{
@@ -154,10 +163,18 @@ namespace base
 				return 0xdead;
 			}
 			pT->UpdateStatus(WORKING);
-			bPost = pT->Run();
+			bQuit = pT->Run();
 			pT->UpdateStatus(STOP);
-			if( bPost && pT->m_win)
-				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
+			if( pT->m_win )
+			{
+				bPost = true;
+				if(bQuit)	break;
+				bPost=false;
+				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);			
+			}
 		}
+		if(bPost)
+			Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
+		return 0xdead;
 	}
 }

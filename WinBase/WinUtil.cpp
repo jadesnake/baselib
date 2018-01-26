@@ -331,6 +331,7 @@ void GetMacAddress(std::string &out)
 				{
 					sprintf(mac,"%02x-%02x-%02x-%02x-%02x-%02x",adaptAddress[0], adaptAddress[1], 
 						adaptAddress[2], adaptAddress[3], adaptAddress[4], adaptAddress[5]);
+					out = mac;
 				}
 				else
 				{
@@ -360,5 +361,76 @@ std::string AllocGuidA()
 	strRet = buf;
 	return strRet;
 }
+std::wstring AllocGuidW()
+{
+	std::wstring strRet;
+	GUID uID;
+	CoCreateGuid(&uID);
+	wchar_t buf[512];
+	memset(buf,0,sizeof(buf));
+	wsprintf(buf,L"%08x%04x%04x%02x%02x%02x%02x%02x%02x%02x%02x"
+		,uID.Data1,uID.Data2,uID.Data3,uID.Data4[0],uID.Data4[1]
+	,uID.Data4[2],uID.Data4[3],uID.Data4[4],uID.Data4[5]
+	,uID.Data4[6],uID.Data4[7]);
+	strRet = buf;
+	return strRet;
+}
+
+void  TraceA(LPCSTR pstrFormat, ...)
+{
+#ifdef _DEBUG
+	char szBuffer[MAX_TRACEBUF] = { 0 };
+	va_list args;
+	va_start(args, pstrFormat);
+	int len = _vscprintf( pstrFormat, args ) // _vscprintf doesn't count
+		+ 1; // terminating '\0'
+	if(len<MAX_TRACEBUF-1)
+	{
+		vsprintf_s(szBuffer, ARRAYSIZE(szBuffer)-1, pstrFormat, args);
+		strcat(szBuffer, "\n");
+		::OutputDebugStringA(szBuffer);
+	}
+	va_end(args);
+#endif
+}
+
+void  TraceW(LPCWSTR pstrFormat, ...)
+{
+#ifdef _DEBUG
+	wchar_t szBuffer[MAX_TRACEBUF] = { 0 };
+	va_list args;
+	va_start(args, pstrFormat);
+	int len = _vscwprintf( pstrFormat, args ) // _vscprintf doesn't count
+		+ 1; // terminating '\0'
+	if(len<MAX_TRACEBUF-1)
+	{
+		vswprintf_s(szBuffer, ARRAYSIZE(szBuffer)-1, pstrFormat, args);
+		wcscat(szBuffer, L"\n");
+		::OutputDebugStringW(szBuffer);
+	}
+	va_end(args);
+#endif
+}
+
+BOOL IsWow64()    
+{    
+	typedef BOOL (WINAPI *LPFN_ISWOW64PROCESS) (HANDLE, PBOOL);    
+	LPFN_ISWOW64PROCESS fnIsWow64Process;
+	BOOL bIsWow64 = FALSE;    
+	//IsWow64Process is not available on all supported versions of Windows.    
+	//Use GetModuleHandle to get a handle to the DLL that contains the function    
+	//and GetProcAddress to get a pointer to the function if available.    
+	fnIsWow64Process = (LPFN_ISWOW64PROCESS) GetProcAddress(    
+		GetModuleHandle(TEXT("kernel32")),"IsWow64Process");   
+	if(NULL != fnIsWow64Process)    
+	{    
+		if (!fnIsWow64Process(GetCurrentProcess(),&bIsWow64))    
+		{    
+			//handle error    
+		}    
+	}    
+	return bIsWow64;    
+}  
+
 
 } // namespace base

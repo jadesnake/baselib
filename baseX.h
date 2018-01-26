@@ -6,6 +6,7 @@ namespace DuiLib
 	class CContainerUI;
 	class CPaintManagerUI;
 }
+#include "MacroX.h"
 namespace base{
 
 	//引用计数器接口
@@ -52,6 +53,151 @@ namespace base{
 		LONG volatile m_unRef;
 		bool m_bDeleteThis;
 	};
+	//CAutoRefPtr provides the basis for all other smart pointers
+	template <class T>
+	class AutoRefPtr
+	{
+	public:
+		AutoRefPtr() throw()
+		{
+			p = NULL;
+		}
+		AutoRefPtr(int nNull) throw()
+		{
+			(void)nNull;
+			p = NULL;
+		}
+		AutoRefPtr(T* lp) throw()
+		{
+			p = lp;
+			if (p != NULL)
+			{
+				p->AddRef();
+			}
+		}
+		AutoRefPtr(const AutoRefPtr & src) throw()
+		{
+			p=src.p;
+			if(p)
+			{
+				p->AddRef();
+			}
+		}
+		~AutoRefPtr() throw()
+		{
+			if (p)
+			{
+				p->RelRef();
+			}
+		}
+		T* operator->() const throw()
+		{
+			return p;
+		}
+		operator T*() const throw()
+		{
+			return p;
+		}
+		T& operator*() const
+		{
+			return *p;
+		}
+		//The assert on operator& usually indicates a bug.  If this is really
+		//what is needed, however, take the address of the p member explicitly.
+		T** operator&() throw()
+		{
+			ASSERT(p==NULL);
+			return &p;
+		}
+		bool operator!() const throw()
+		{
+			return (p == NULL);
+		}
+		bool operator<(T* pT) const throw()
+		{
+			return p < pT;
+		}
+		bool operator!=(T* pT) const
+		{
+			return !operator==(pT);
+		}
+		bool operator==(T* pT) const throw()
+		{
+			return p == pT;
+		}
+		T* operator=(T* lp) throw()
+		{
+			if(*this!=lp)
+			{
+				if(p)
+				{
+					p->RelRef();
+				}
+				p=lp;
+				if(p)
+				{
+					p->AddRef();
+				}
+			}
+			return *this;
+		}
+		T* operator=(const AutoRefPtr<T>& lp) throw()
+		{
+			if(*this!=lp)
+			{
+				if(p)
+				{
+					p->RelRef();
+				}
+				p=lp;
+				if(p)
+				{
+					p->AddRef();
+				}
+			}
+			return *this;	
+		}
+		// Release the interface and set to NULL
+		void RelRef() throw()
+		{
+			T* pTemp = p;
+			if (pTemp)
+			{
+				p = NULL;
+				pTemp->RelRef();
+			}
+		}
+		// Attach to an existing interface (does not AddRef)
+		void Attach(T* p2) throw()
+		{
+			if (p)
+			{
+				p->RelRef();
+			}
+			p = p2;
+		}
+		// Detach the interface (does not Release)
+		T* Detach() throw()
+		{
+			T* pt = p;
+			p = NULL;
+			return pt;
+		}
+		HRESULT CopyTo(T** ppT) throw()
+		{
+			if (ppT == NULL)
+				return E_POINTER;
+			*ppT = p;
+			if (p)
+			{
+				p->AddRef();
+			}
+			return S_OK;
+		}
+	protected:
+		T* p;
+	};
+
 	//应用常用初始化和释放
 	class AppInitialize
 	{
@@ -79,8 +225,16 @@ namespace base{
 	class DLL
 	{
 	public:
+		DLL() : m_dwError(0)
+		{
+
+		}
 		//需要传完整路径
 		DLL(LPCTSTR pDll) : m_dwError(0)
+		{
+			Load(pDll);
+		}
+		void Load(LPCTSTR pDll)
 		{
 			TCHAR chOld[MAX_PATH+1];
 			TCHAR chMax[MAX_PATH+1];
@@ -124,6 +278,7 @@ namespace base{
 			}
 			return m_dwError;
 		}
+		DISALLOW_COPY_AND_ASSIGN(DLL);
 	protected:
 		HMODULE	m_hModule;
 		DWORD	m_dwError;

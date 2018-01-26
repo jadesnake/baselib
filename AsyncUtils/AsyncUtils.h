@@ -85,6 +85,7 @@ namespace base{
 		virtual void start();
 		virtual void close();
 		virtual void stop();
+		virtual void quit();
 		virtual Status  getStatus();
 		virtual CAtlString getLastError();
 		virtual void UpdateLastError(const CAtlString& v);

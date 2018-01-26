@@ -10,6 +10,12 @@
 
 namespace curl
 {
+	class CDebug
+	{
+	public:
+		virtual void OnCurlDbgRelease() = 0;
+		virtual void OnCurlDbgTrace(const std::stringstream& ss) = 0;
+	};
 	class CHttpClient
 	{
 	public:
@@ -80,6 +86,7 @@ namespace curl
 		std::string GetStream();
 		std::string GetHeader();
 		std::vector<std::string> GetChunks();
+		std::string MakeChunks();
 		//
 		void		EnableDecode(bool bDecode);
 		static void GlobalSetup();
@@ -90,6 +97,7 @@ namespace curl
 		void		SetEncodeUrl(bool e);
 		long		ReqeustCode();
 		void		ClearAll();
+		void		SetDebug(CDebug *dbg);
 	protected:
 		std::string encodeParam();
 	protected:
@@ -104,6 +112,8 @@ namespace curl
 		std::stringstream	m_wbuf;
 		std::stringstream	m_rbuf;
 		std::stringstream	m_headbuf;
+
+		CDebug *m_dbg;
 	private:
 		CURL		*m_url;
 		struct curl_slist	 *m_headerlist;

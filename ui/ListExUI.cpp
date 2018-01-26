@@ -12,5 +12,7 @@ namespace CustomUI
 		__super::SetPos(rc);
 		RECT rcBody = m_pList->GetPos();
 		m_pList->SetPos(rcBody);
+		if(firePos)
+			firePos(this);
 	}
 }

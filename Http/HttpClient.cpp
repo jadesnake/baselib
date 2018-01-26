@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "HttpClient.h"
 namespace curl {
+
 	static int dbg_trace(CURL *handle, curl_infotype type,char *data, size_t size,void *userp)
 	{
 		std::stringstream buf;
@@ -10,28 +11,32 @@ namespace curl {
 		default: /* in case a new one is introduced to shock us */
 			return 0;
 		case CURLINFO_HEADER_OUT:
-			buf << "=> Send header";
+			buf <<std::endl<<"=> Send header";
 			break;
 		case CURLINFO_DATA_OUT:
-			buf << "=> Send data";
+			buf <<std::endl<< "=> Send data";
 			break;
 		case CURLINFO_SSL_DATA_OUT:
-			buf << "=> Send SSL data";
+			buf <<std::endl<< "=> Send SSL data";
 			break;
 		case CURLINFO_HEADER_IN:
-			buf << "<= Recv header";
+			buf <<std::endl<< "<= Recv header";
 			break;
 		case CURLINFO_DATA_IN:
-			buf << "<= Recv data";
+			buf <<std::endl<< "<= Recv data";
 			break;
 		case CURLINFO_SSL_DATA_IN:
-			buf << "<= Recv SSL data";
+			buf <<std::endl<< "<= Recv SSL data";
 			break;
 		}
 		buf.write((char *)data, size);
 		buf.flush();
 		buf << "\r\n";
 		::OutputDebugStringA(buf.str().c_str());
+		CDebug *dbg = static_cast<CDebug*>(userp);	
+		if(dbg)
+			dbg->OnCurlDbgTrace(buf);
+
 		return 0;
 	}
 	int StreamSeek(void *userp, curl_off_t offset, int origin) 
@@ -112,10 +117,17 @@ namespace curl {
 		,m_Save2File(NULL)
 		,m_bDecodeBody(false)
 		,m_bEncodeUrl(true)
+		,m_dbg(NULL)
 	{
 		m_tmOut = 10000;
 		m_tgProxy.nType = Proxy::NONE;
 		m_url   = curl_easy_init();
+	}
+	void CHttpClient::SetDebug(CDebug *dbg)
+	{
+		if(m_dbg)
+			return ;
+		m_dbg = dbg;
 	}
 	void CHttpClient::SetContent(const std::string& data) 
 	{
@@ -128,6 +140,11 @@ namespace curl {
 	CHttpClient::~CHttpClient()
 	{
 		ClearAll();
+		if(m_dbg)
+		{
+			m_dbg->OnCurlDbgRelease();
+			m_dbg = NULL;
+		}
 	}
 	void	CHttpClient::ClearAll()
 	{
@@ -348,6 +365,12 @@ namespace curl {
 			curl_easy_setopt(m_url, CURLOPT_HEADERFUNCTION, StreamHeader);
 		}
 		//curl_easy_setopt(m_url, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+		if(m_dbg)
+		{
+			curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
+			curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
+			curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
+		}
 #if defined(_DEBUG)
 		curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
 		curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
@@ -449,12 +472,13 @@ namespace curl {
 		}
 		return chunked;
 	}
-	void readChuckFromStream(std::stringstream &ss,std::string &out,int nlen)
+	//有些服务chuck长度和实际数据不一致
+	void readChuckFromStream(std::stringstream &ss,std::string &out,long nlen)
 	{
 		char line[128];
-		int npos = 0;	//块数
-		int nys = 0;	//余数
-		int buflen = 0;
+		long npos = 0;	//块数
+		long nys = 0;	//余数
+		long buflen = 0;
 		if(nlen<sizeof(line))
 		{
 			npos = 1;
@@ -468,7 +492,7 @@ namespace curl {
 			nys = nlen-npos*sizeof(line);
 		}
 		out.clear();
-		for(int n=0;n<npos;n++)
+		for(long n=0;n<npos;n++)
 		{
 			memset(line,0,sizeof(line));
 			if(ss.read(line,buflen))
@@ -480,6 +504,25 @@ namespace curl {
 			if(ss.read(line,nys))
 				out.append(line,nys);
 		}
+	}
+	//有些服务chuck长度和实际数据不一致
+	void readChuckFromStream(std::stringstream &ss,std::string &out)
+	{
+		char crlf[2]={0,0};
+		char chTmp=0;
+		std::string chuck;
+		while(ss.read(&chTmp,1))
+		{
+			if(chTmp=='\r' && ss.peek()=='\n')
+			{
+				//跳过末尾
+				ss.seekg(1,std::ios::cur);
+				break ;
+			}
+			chuck += chTmp;
+		}
+		out = chuck;
+		return ;
 	}
 	std::vector<std::string> CHttpClient::GetChunks()
 	{
@@ -503,8 +546,13 @@ namespace curl {
 			sscanf(line, "%x", &nChuck);
 			if(nChuck==0)
 				break;
+			if(nChuck<0)
+			{
+				error = true;
+				break;
+			}
 			std::string elem;
-			readChuckFromStream(m_wbuf,elem,nChuck);
+			readChuckFromStream(m_wbuf,elem);
 			memset(line,0,sizeof(line));
 			ret.push_back(elem);
 			//读取两个字符判断当前chuck末尾
@@ -516,6 +564,19 @@ namespace curl {
 		{
 			ret.push_back(GetStream());			
 			return ret;
+		}
+		return ret;
+	}
+	std::string CHttpClient::MakeChunks()
+	{
+		std::vector<std::string> vtSome;
+		vtSome = GetChunks();
+		if(vtSome.size()==1)
+			return vtSome[0];
+		std::string ret("");
+		for(size_t n=0;n<vtSome.size();n++)
+		{
+			ret += vtSome[n];
 		}
 		return ret;
 	}

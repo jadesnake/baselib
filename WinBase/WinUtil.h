@@ -6,7 +6,6 @@
 
 namespace base
 {
-
  bool IsAddressInCurrentModule(void* address);
  bool IsModuleHandleValid(HMODULE module_handle);
  HMODULE GetModuleHandleFromAddress(void* address);
@@ -35,8 +34,19 @@ namespace base
  //获取适配器1 mac
  void GetMacAddress(std::string &mac);
 
- std::string AllocGuidA();
+ BOOL IsWow64();
 
+ std::string  AllocGuidA();
+ std::wstring AllocGuidW();
+
+ #define MAX_TRACEBUF    502
+ void  TraceA(LPCSTR pstrFormat, ...);
+ void  TraceW(LPCWSTR pstrFormat, ...);
+ #ifdef _UNICODE
+ #define MyTRACE TraceW
+ #else
+ #define MyTRACE TraceA
+ #endif
 } 
 
 

@@ -27,7 +27,7 @@ byte nibbleFromChar(char c)
 	if(c >= 'A' && c <= 'F') return c - 'A' + 10;
 	return 255;
 }
-bool decodeHex(const char *inhex,DWORD hexlen,CAtlStringA &to)
+bool decodeHex(const char *inhex,DWORD hexlen,std::string &to)
 {
 	byte *retval;
 	byte *p;
@@ -42,41 +42,59 @@ bool decodeHex(const char *inhex,DWORD hexlen,CAtlStringA &to)
 		p += 2;
 	}
 	retval[len] = 0;
-	to.Empty();
-	to.Append((char*)retval);
+	to.clear();
+	to.append((char*)retval);
 	free(retval);
 	return true;
 }
 
-void AesEncode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey)
+void AesEncode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt::BIN_TYPE type)
 {
 	WinAES	wA;
-	byte	chOut[1024];
+	long int MaxCount=3*strIn.GetLength();
+	byte *chOut = new byte[MaxCount];
+	size_t  nOutlen = MaxCount;
+	memset(chOut,0,MaxCount);
+	/*byte	chOut[204800];
 	size_t  nOutlen = sizeof(chOut);
-	memset(chOut,0,sizeof(chOut));
+	memset(chOut,0,sizeof(chOut));*/
 	wA.SetKey((byte*)strKey.GetString(),strKey.GetLength());
 	wA.Encrypt((byte*)strIn.GetString(),strIn.GetLength(),chOut,nOutlen);
-	//encodeHex((const char*)chOut,nOutlen,strOut);
-	std::string tmpBase64((char*)chOut,nOutlen);
-	tmpBase64 = base::encode64(tmpBase64);
-	strOut.Empty();
-	strOut.Append(tmpBase64.c_str());
+	if(type==encrypt::BIN_BASE64)
+	{
+		std::string tmpBase64((char*)chOut,nOutlen);
+		tmpBase64 = base::encode64(tmpBase64);
+		strOut.Empty();
+		strOut.Append(tmpBase64.c_str());
+		delete []chOut;
+		return ;
+	}
+	if(type==encrypt::BIN_HEX)
+	{
+		encodeHex((const char*)chOut,nOutlen,strOut);
+	}
+	delete []chOut;
 }
-void AesDecode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey)
+void AesDecode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt::BIN_TYPE type)
 {
 	WinAES	wA;
 	byte	*chOut=NULL;
-	std::string binData = base::decode64(strIn.GetString());
+	std::string binData;
+	if(type==encrypt::BIN_BASE64)
+	{
+		binData = base::decode64(strIn.GetString());
+	}
+	else if(type==encrypt::BIN_HEX)
+	{
+		decodeHex(strIn.GetString(),strIn.GetLength(),binData);
+	}
 	size_t  nOutlen = binData.size()*3;
 	chOut = new byte[nOutlen];
-
 	memset(chOut,0,sizeof(chOut));
-	//decodeHex(strIn.GetString(),strIn.GetLength(),strOut);
 	wA.SetKey((byte*)strKey.GetString(),strKey.GetLength());
 	wA.Decrypt((byte*)binData.c_str(),binData.size(),chOut,nOutlen);
 	strOut.Empty();
 	strOut.Append((const char*)chOut,nOutlen);
-
 	delete []chOut;
 }
 

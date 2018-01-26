@@ -14,12 +14,7 @@ namespace SingleCpp
 		}
 		virtual ~Garbo()
 		{
-			EnterCriticalSection(&m_csLock);
-			if (gSingle)
-				delete gSingle;
-			gSingle = NULL;
-			LeaveCriticalSection(&m_csLock);
-			DeleteCriticalSection(&m_csLock);
+			Destroy();
 		}
 		theC* Get()
 		{
@@ -30,6 +25,15 @@ namespace SingleCpp
 			ret = gSingle;
 			LeaveCriticalSection(&m_csLock);
 			return ret;
+		}
+		void Destroy()
+		{
+			EnterCriticalSection(&m_csLock);
+			if (gSingle)
+				delete gSingle;
+			gSingle = NULL;
+			LeaveCriticalSection(&m_csLock);
+			DeleteCriticalSection(&m_csLock);
 		}
 	private:
 		bool m_init;
@@ -43,4 +47,5 @@ namespace SingleCpp
 	className& operator=(const className&);			\
 	className(void); virtual ~className(void);		\
 	public:											\
-	static className *Get(){ static SingleCpp::Garbo<className> logic; return logic.Get();	}
+	static className *Get(){ static SingleCpp::Garbo<className> logic; return logic.Get(); }	\
+	static void Destroy(){ static SingleCpp::Garbo<className> logic;  logic.Destroy();  }
