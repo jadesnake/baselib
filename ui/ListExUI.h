@@ -12,6 +12,6 @@ namespace CustomUI
 		DuiLib::CEventSource firePos;
 		DUI_DECLARE(CustomUI::ListUI,DuiLib::CListUI)
 	protected:
-
+		void PaintBorder(HDC hDC);
 	};
 }
