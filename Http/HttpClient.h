@@ -13,6 +13,7 @@ namespace curl
 	class CDebug
 	{
 	public:
+		virtual ~CDebug(){	}
 		virtual void OnCurlDbgRelease() = 0;
 		virtual void OnCurlDbgTrace(const std::stringstream& ss) = 0;
 	};
@@ -114,6 +115,7 @@ namespace curl
 		std::stringstream	m_headbuf;
 
 		CDebug *m_dbg;
+		bool bHttps;
 	private:
 		CURL		*m_url;
 		struct curl_slist	 *m_headerlist;

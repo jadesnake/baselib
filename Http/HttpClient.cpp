@@ -119,6 +119,7 @@ namespace curl {
 		,m_bEncodeUrl(true)
 		,m_dbg(NULL)
 	{
+		bHttps = false;
 		m_tmOut = 10000;
 		m_tgProxy.nType = Proxy::NONE;
 		m_url   = curl_easy_init();
@@ -306,8 +307,13 @@ namespace curl {
 		}
 		if( std::string::npos!=url.find("https") )
 		{
+			bHttps = true;
 			curl_easy_setopt(m_url,CURLOPT_SSL_VERIFYPEER,false);
 			curl_easy_setopt(m_url,CURLOPT_SSL_VERIFYHOST,false);
+		}
+		else
+		{
+			bHttps = false;
 		}
 		curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, 10);		//链接超时
 		if (m_headerlist)
@@ -369,7 +375,8 @@ namespace curl {
 		{
 			curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
 			curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
-			curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
+			if(bHttps==false)
+				curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
 		}
 #if defined(_DEBUG)
 		curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
@@ -583,6 +590,13 @@ namespace curl {
 	std::string	CHttpClient::GetStream()
 	{
 		std::string strRet("");
+		if(bHttps && m_dbg)
+		{
+			std::stringstream trace;
+			trace<<"code "<<ReqeustCode()<<" data "<< m_wbuf.str();
+			trace.flush();
+			m_dbg->OnCurlDbgTrace(trace);
+		}
 		if(200!=ReqeustCode())
 			return strRet;	//非200返回空
 		if( m_wbuf.tellp() < 0 ) 
