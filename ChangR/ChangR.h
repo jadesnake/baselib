@@ -1,0 +1,216 @@
+#pragma once
+
+//长软接口
+#include "cryp_ctrl.tlh"
+
+class ChangRuan
+{
+public:
+	typedef enum{
+		BEIJING,	//北京
+		TIANJIN,	//天津
+		HEBEI,		//河北
+		SANXI,		//山西
+		NEIMENG,	//内蒙古
+		LIAONING,	//辽宁
+		DALIAN,		//大连
+		JILIN,		//吉林
+		HEILJ,		//黑龙江
+		SHANGHAI,	//上海
+		JIANGSHU,	//江苏
+		ZHEJIANG,	//浙江
+		NINGBO,		//宁波
+		ANHUI,		//安徽
+		FUJIAN,		//福建
+		XIAMEN,		//厦门
+		GUIZHOU,	//贵州
+		YUNNAN,		//云南
+		XIZANG,		//西藏
+		SHANXI,		//陕西
+		GANSU,		//甘肃
+		QINGHAI,	//青海
+		NINGXIA,	//宁夏
+		XINJIANG,	//新疆
+		JIANGXI,	//江西
+		SANDONG,	//山东
+		QINGDAO,	//青岛
+		HENAN,		//河南
+		HUBEI,		//湖北
+		HUNAN,		//湖南
+		GUANGDONG,	//广东
+		SHENZHEN,	//深圳
+		GUANGXI,	//广西
+		HAINAN,		//海南
+		CHONGQING,	//重庆
+		SHICHUAN	//四川
+	}AREA;
+	class Query
+	{
+	public:
+		Query()
+		{
+			rz = RZ_ALL;
+			nMax= _T("500");
+			page=_T("0");
+		}
+		typedef enum{
+			RZ_YES,
+			RZ_NO,
+			RZ_ALL
+		}ZTRZ;
+		ZTRZ rz;	//认证
+		CAtlString ksrq;	//开始日期
+		CAtlString jsrq;	//结束日期
+		CAtlString nMax;
+		CAtlString page;	//当前页面
+	};
+	//勾选
+	class Gx
+	{
+	public:
+		//勾选状态
+		typedef enum{
+			GX_YES,
+			GX_NO
+		}ZT;
+		Gx()
+		{
+			zt = GX_NO;
+		}
+		CAtlString dm;
+		CAtlString hm;
+		CAtlString kprq;
+		ZT zt;
+	};
+	class Rz
+	{
+	public:
+		typedef enum{
+			RZ_GX,	//已勾选未确认
+			RZ_QR	//已经确认
+		}RZZT;
+		Rz()
+		{
+			zt = RZ_GX;
+			nMax= _T("500");
+			page=_T("0");
+		}
+		RZZT zt;	//认证状态
+		CAtlString nMax;
+		CAtlString page;	//当前页面
+	};
+	class Log
+	{
+	public:
+		virtual ~Log(){	}
+		virtual void Release(){	 delete this; }		
+		virtual void OnHttpTrace(const std::stringstream& ss)=0;
+		virtual void OnOperator(const std::string& method){ }
+	};
+
+	ChangRuan();
+	virtual ~ChangRuan();
+	void SetLog(Log *log);
+	bool IsInitAndPwd();
+	void SetPwd(const CAtlString& pwd);
+	void SetArea(AREA area);
+	bool Init();
+	bool CheckPwd(const CAtlString& pwd);
+	bool ReInitAndPwd();
+	bool ReLogin();
+	bool Login(AREA area);
+	bool Quit();
+	CAtlString GetUserInfo();
+	//查询发票信息
+	bool GetFpFromGx(const Query& q,std::string &out);
+	//根据年份获取认证信息
+	bool GetRzTjByNf(const CAtlString& nf,std::string &out);
+	//根据年份月份获取抵扣统计
+	//date格式"201702"
+	bool GetDkTjByDate(const CAtlString& date,std::string &out);
+	//根据税款所属期查询
+	bool GetQrGxBySsq(const CAtlString& ssq,std::string &out);
+	//确认勾选
+	bool ConfirmGx();
+	//保存勾选状态
+	bool SubmitGx(const std::vector<Gx>& gx);
+	//查询勾选认证发票
+	bool QueryRzfp(const Rz& rz,std::string& out);
+
+	const CAtlString& GetLastMsg();
+	void CopyData(const ChangRuan& cr);
+	void Release();
+	void EnableAutoQuit(bool b);
+	const CAtlString& GetTaxNo() const	{
+		return m_tax;
+	}
+	bool QueryQrgx();
+protected:
+	bool SecondLogin();
+	bool SecondConfirmGx();
+	bool ThirdConfirmGx(const std::string& p1,const std::string& p2);
+
+	CAtlString MakeClientAuthCode(const CAtlString& svrPacket);
+	CAtlString MakeClientHello();
+	bool OpenDev();
+	bool CloseDev();
+	CAtlString GetTickCount();
+	bool BeforeConfirmGx();
+public:
+	CAtlString   m_token;
+	CAtlString   m_ip;
+	CAtlString   m_pwd;
+	CAtlString   m_authCode;
+
+	CAtlString   m_Ymbb;
+	CAtlString	 m_nsrmc;
+	CAtlString	 m_dqrq;
+	CAtlString   m_svrPacket;
+	CAtlString   m_svrRandom;
+	CAtlString   m_skssq;
+	CAtlString	 m_tax;
+	//用于确认勾选
+	CAtlString   m_cookssq;	//勾选所属期
+	CAtlString   m_gxrqfw;	//勾选范围
+	//
+	AREA m_area;
+private:
+	Log	*m_log;
+	CAtlString   m_lastMsg;
+
+	CComPtr<_CryptCtl>  crypCtrl;
+	
+	//勾选确认后返回的数据
+	std::string  m_qrgxData;
+
+	bool m_atuoQuit;
+	bool m_hasInitPwd;
+};
+//勾选平台
+namespace GxPt
+{
+	//首页认证统计数据
+	class RzTj
+	{
+	public:
+		CAtlString tm;		//时间
+		CAtlString zhangs;	//发票张数
+		CAtlString sehj;	//税额合计
+		CAtlString zt;		//状态 1-已过税款所属期 0-当前所属期 2未到税款所属期
+		void clear(){
+			tm.Empty();
+			zhangs.Empty();
+			sehj.Empty();
+		}
+	};
+	struct SortDesc
+	{
+		bool operator()(const CAtlString& k1,const CAtlString& k2)const
+		{
+			return k1>k2;
+		}
+	};
+	typedef std::map<CAtlString,RzTj,SortDesc> RzTjs;
+	//处理GetRzTjByNf 返回的key3值
+	void HandleRzTjByNf(const std::string& key3,RzTjs &out);
+}
