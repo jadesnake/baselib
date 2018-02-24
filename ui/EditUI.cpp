@@ -7,7 +7,6 @@ namespace CustomUI
 		: m_bkTextColor(0),m_bkFont(0),m_bkTextStyle(DT_LEFT),
 		  m_needbktext(true),m_bIME(true),m_imc(NULL)
 	{
-		chPwdChar = L'¡ñ';
 		memset(&m_bkTextPadding,0,sizeof(RECT));
 	}
 	EditUI::~EditUI(void)
@@ -16,7 +15,6 @@ namespace CustomUI
 	}
 	bool EditUI::IsPasswordMode()
 	{
-		//return m_bPasswordMode;
 		return ((__super::GetWinStyle()&ES_PASSWORD)==ES_PASSWORD);
 	}
 	bool EditUI::IsMultiLine()
@@ -38,21 +36,13 @@ namespace CustomUI
 	}
 	void EditUI::Init()
 	{
-		__super::DoInit();
 		if(IsPasswordMode())
 		{
-			m_pTwh->SetPasswordChar(chPwdChar);
+			m_pTwh->SetPasswordChar(L'¡ñ');
 			EnableIME(false);
-			SetRich(false);
 		}
+		__super::DoInit();
 	}
-	void EditUI::SetPasswordChar(TCHAR c)
-	{
-		chPwdChar = c;
-		if(m_pTwh)
-			m_pTwh->SetPasswordChar(chPwdChar);
-	}
-
 	void EditUI::OnTxNotify(DWORD iNotify, void *pv)
 	{
 		if(iNotify==EN_UPDATE)
@@ -174,6 +164,7 @@ namespace CustomUI
 			hr = __super::TxSendMessage(msg,wparam,lparam,plresult);
 			if(pT->OnInputEvent)
 				pT->OnInputEvent(pT);
+			pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_TEXTCHANGED);
 			return hr;
 		}
 		if( msg==WM_KEYDOWN )
@@ -200,6 +191,7 @@ namespace CustomUI
 				hr = __super::TxSendMessage(msg,wparam,lparam,plresult);
 				if(pT->OnInputEvent)
 					pT->OnInputEvent(pT);
+				pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_TEXTCHANGED);
 				return hr;
 			}
 		}
@@ -222,6 +214,7 @@ namespace CustomUI
 				hr = __super::TxSendMessage(msg,wparam,lparam,plresult);
 				if(pT->OnInputEvent)
 					pT->OnInputEvent(pT);
+				pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_TEXTCHANGED);
 			}
 			return hr;
 		}
@@ -303,12 +296,6 @@ namespace CustomUI
 			rcTextPadding.right = _tcstol(pstr + 1, &pstr, 10);  ASSERT(pstr);    
 			rcTextPadding.bottom = _tcstol(pstr + 1, &pstr, 10); ASSERT(pstr);    
 			SetBkTextPadding(rcTextPadding);
-		}
-		if( _tcscmp(pstrName, _T("password")) == 0 )
-		{
-			if(_tcscmp(pstrValue, _T("true")))
-				return;
-			Invalidate();
 		}
 		__super::SetAttribute(pstrName,pstrValue);
 	}

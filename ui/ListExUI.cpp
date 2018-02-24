@@ -12,105 +12,53 @@ namespace CustomUI
 		__super::SetPos(rc);
 		RECT rcBody = m_pList->GetPos();
 		m_pList->SetPos(rcBody);
-		if(firePos)
-			firePos(this);
 	}
-	void ListUI::PaintBorder(HDC hDC)
+	void ListUI::ScrollAt(DuiLib::CControlUI *item)
 	{
-		DuiLib::CScrollBarUI *vBar = GetVerticalScrollBar();
-		if(vBar && vBar->IsVisible() )
+		SIZE szScrollPos = GetScrollPos();
+		if( this->GetScrollRange().cy<=0 )
 		{
-			DuiLib::CListUI::PaintBorder(hDC);
+			this->SetScrollPos(szScrollPos);
 			return ;
 		}
-		RECT rcBorder = m_rcItem;
-		DuiLib::CListHeaderUI *header = GetHeader();
-		DuiLib::CControlUI *last = NULL;
-		bool calHeader = true;
-		if(GetCount())
+		bool bHas = false;
+		int nAdjustables = 0;
+		int nEstimateNum = 0;
+		long cyFixed = 0;
+		//计算有效区域
+		RECT rcPos = GetPos();
+		rcPos.left += GetInset().left;
+		rcPos.top += GetInset().top;
+		rcPos.right -= GetInset().right;
+		rcPos.bottom -= GetInset().bottom;
+		SIZE szAvailable = { rcPos.right - rcPos.left, rcPos.bottom - rcPos.top };
+		//计算高度
+		for(int n=0;n<GetCount();n++)
 		{
-			DuiLib::CControlUI *tmp = NULL;
-			for(int n=GetCount()-1;n>=0;n++)
+			DuiLib::CControlUI *inner = GetItemAt(n);
+			if(inner==item)
 			{
-				tmp = GetItemAt(n);
-				if(!tmp->IsFloat() && tmp->IsVisible())
-				{
-					last = tmp;
-					break;
-				}
+				bHas = true;
+				break;
 			}
-			if(last)
-			{
-				rcBorder.bottom = last->GetPos().bottom;
-				calHeader = false;
+			if( !inner->IsVisible() ) continue;
+			if( inner->IsFloat() ) continue;
+			SIZE sz = inner->EstimateSize(szAvailable);
+			if( sz.cy == 0 ) {
+				nAdjustables++;
 			}
+			else {
+				if( sz.cy < inner->GetMinHeight() ) sz.cy = inner->GetMinHeight();
+				if( sz.cy > inner->GetMaxHeight() ) sz.cy = inner->GetMaxHeight();
+			}
+			cyFixed += sz.cy + inner->GetPadding().top + inner->GetPadding().bottom;
+			nEstimateNum++;
+		}
+		cyFixed += (nEstimateNum - 1) * GetChildPadding();
+		if(bHas)
+		{
+			szScrollPos.cy = cyFixed;
+			this->SetScrollPos(szScrollPos);
 		}		
-		if(calHeader)
-		{
-			rcBorder.bottom = header->GetPos().bottom;
-		}
-		rcBorder.bottom += GetInset().bottom;
-
-		if(m_dwBorderColor != 0 || m_dwFocusBorderColor != 0)
-		{
-			if(m_nBorderSize > 0 && ( m_cxyBorderRound.cx > 0 || m_cxyBorderRound.cy > 0 ))//画圆角边框
-			{
-				if (IsFocused() && m_dwFocusBorderColor != 0)
-					DuiLib::CRenderEngine::DrawRoundRect(hDC, rcBorder, m_nBorderSize, m_cxyBorderRound.cx, m_cxyBorderRound.cy, GetAdjustColor(m_dwFocusBorderColor));
-				else
-					DuiLib::CRenderEngine::DrawRoundRect(hDC, rcBorder, m_nBorderSize, m_cxyBorderRound.cx, m_cxyBorderRound.cy, GetAdjustColor(m_dwBorderColor));
-			}
-			else
-			{
-				if (IsFocused() && m_dwFocusBorderColor != 0 && m_nBorderSize > 0)
-					DuiLib::CRenderEngine::DrawRect(hDC, m_rcItem, m_nBorderSize, GetAdjustColor(m_dwFocusBorderColor),m_nBorderStyle);
-				else if(m_rcBorderSize.left > 0 || m_rcBorderSize.top > 0 || m_rcBorderSize.right > 0 || m_rcBorderSize.bottom > 0)
-				{
-					RECT rcBorderTmp;
-					if(m_rcBorderSize.left > 0){
-						rcBorderTmp		= rcBorder;
-						rcBorderTmp.right	= rcBorder.left;
-						if(IsFocused() && m_dwFocusBorderColor != 0)
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.left,GetAdjustColor(m_dwFocusBorderColor),m_nBorderStyle);
-						else
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.left,GetAdjustColor(m_dwBorderColor),m_nBorderStyle);
-					}
-					if(m_rcBorderSize.top > 0){
-						rcBorderTmp		= rcBorder;
-						rcBorderTmp.bottom	= rcBorder.top;
-						if(IsFocused() && m_dwFocusBorderColor != 0)
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.top,GetAdjustColor(m_dwFocusBorderColor),m_nBorderStyle);
-						else
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.top,GetAdjustColor(m_dwBorderColor),m_nBorderStyle);
-					}
-					if(m_rcBorderSize.right > 0){
-						rcBorderTmp		= rcBorder;
-						rcBorderTmp.left	= rcBorder.right;
-						rcBorderTmp.left = rcBorderTmp.left-1;
-						rcBorderTmp.right = rcBorderTmp.right-1;
-						if(IsFocused() && m_dwFocusBorderColor != 0)
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.right,GetAdjustColor(m_dwFocusBorderColor),m_nBorderStyle);
-						else
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.right,GetAdjustColor(m_dwBorderColor),m_nBorderStyle);
-					}
-					if(m_rcBorderSize.bottom > 0){
-						rcBorderTmp		= rcBorder;
-						rcBorderTmp.top	= rcBorder.bottom;
-						rcBorderTmp.top = rcBorderTmp.top-1;
-						rcBorderTmp.bottom = rcBorderTmp.bottom-1;
-						if(IsFocused() && m_dwFocusBorderColor != 0)
-						{
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.bottom,GetAdjustColor(m_dwFocusBorderColor),m_nBorderStyle);
-						}
-						else
-						{
-							DuiLib::CRenderEngine::DrawLine(hDC,rcBorderTmp,m_rcBorderSize.bottom,GetAdjustColor(m_dwBorderColor),m_nBorderStyle);
-						}
-					}
-				}
-				else if(m_nBorderSize > 0)
-					DuiLib::CRenderEngine::DrawRect(hDC, rcBorder, m_nBorderSize, GetAdjustColor(m_dwBorderColor),m_nBorderStyle);
-			}
-		}
 	}
 }

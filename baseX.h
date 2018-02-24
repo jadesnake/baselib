@@ -163,8 +163,10 @@ namespace base{
 			T* pTemp = p;
 			if (pTemp)
 			{
-				p = NULL;
-				pTemp->RelRef();
+				if(0==pTemp->RelRef())
+				{
+					p = NULL;
+				}				
 			}
 		}
 		// Attach to an existing interface (does not AddRef)

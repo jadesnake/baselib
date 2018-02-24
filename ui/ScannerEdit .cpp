@@ -15,6 +15,23 @@ namespace CustomUI{
 	{
 
 	}
+	void ScannerEditUI::EnaleMultiLine(bool b)
+	{
+		long style = __super::GetWinStyle();
+		if(b==false)
+			style &= ~ES_MULTILINE;
+		else
+			style |= ES_MULTILINE;
+		__super::SetWinStyle(style);
+		LRESULT ret = 0;
+		__super::TxSendMessage(EM_SETOPTIONS,ECOOP_SET,style,&ret);
+	}
+	void ScannerEditUI::Init()
+	{
+		EnaleMultiLine(false);
+		SetRich(false);
+		__super::DoInit();
+	}
 	void ScannerEditUI::DoEvent(DuiLib::TEventUI& event)
 	{
 		if( event.Type == DuiLib::UIEVENT_KILLFOCUS )
@@ -247,7 +264,6 @@ namespace CustomUI{
 		}
 		if( msg==WM_CHAR )
 		{
-			DuiLib::DUI__Trace(_T("WM_CHAR w %x l %x"),wparam,lparam);
 			bool bInput = true;
 			{
 				DuiLib::TEventUI ev;
@@ -268,7 +284,6 @@ namespace CustomUI{
 			}
 			if(replace && (wparam!=VK_RETURN)  )
 			{
-
 				//Ìæ»»ÎÄ±¾
 				if(bInput)
 					hr = __super::TxSendMessage(msg,wparam,lparam,plresult);

@@ -18,8 +18,6 @@ namespace CustomUI
 		bool IsMultiLine();
 		void EnaleMultiLine(bool b);
 		void EnableIME(bool b);
-		void SetPasswordChar(TCHAR c);
-		
 		virtual void Init();
 		DuiLib::CEventSource OnInputEvent;
 		DuiLib::CEventSource OnInputFilter;
@@ -40,6 +38,5 @@ namespace CustomUI
 		bool  m_needbktext;
 		bool  m_bIME;				//是否允许输入法
 		HIMC  m_imc;
-		wchar_t chPwdChar;
 	};
 }

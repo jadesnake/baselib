@@ -51,13 +51,9 @@ bool decodeHex(const char *inhex,DWORD hexlen,std::string &to)
 void AesEncode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt::BIN_TYPE type)
 {
 	WinAES	wA;
-	long int MaxCount=3*strIn.GetLength();
-	byte *chOut = new byte[MaxCount];
-	size_t  nOutlen = MaxCount;
-	memset(chOut,0,MaxCount);
-	/*byte	chOut[204800];
+	byte	chOut[1024];
 	size_t  nOutlen = sizeof(chOut);
-	memset(chOut,0,sizeof(chOut));*/
+	memset(chOut,0,sizeof(chOut));
 	wA.SetKey((byte*)strKey.GetString(),strKey.GetLength());
 	wA.Encrypt((byte*)strIn.GetString(),strIn.GetLength(),chOut,nOutlen);
 	if(type==encrypt::BIN_BASE64)
@@ -66,14 +62,12 @@ void AesEncode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt:
 		tmpBase64 = base::encode64(tmpBase64);
 		strOut.Empty();
 		strOut.Append(tmpBase64.c_str());
-		delete []chOut;
 		return ;
 	}
 	if(type==encrypt::BIN_HEX)
 	{
 		encodeHex((const char*)chOut,nOutlen,strOut);
 	}
-	delete []chOut;
 }
 void AesDecode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt::BIN_TYPE type)
 {

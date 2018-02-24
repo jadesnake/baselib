@@ -23,6 +23,8 @@ namespace CustomUI
 		DuiLib::CEventSource OnHaveFocus;
 		DUI_DECLARE(CustomUI::ScannerEditUI,DuiLib::CRichEditUI)
 	protected:
+		void Init();
+		void EnaleMultiLine(bool b);
 		bool OnScanInput(void *param);
 		void DoEvent(DuiLib::TEventUI& event);
 		void PaintText(HDC hDC);
