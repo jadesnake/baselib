@@ -44,14 +44,24 @@ public:
 		CHONGQING,	//重庆
 		SHICHUAN	//四川
 	}AREA;
-	class Query
+	class Pager
+	{
+	public:
+		Pager()
+		{
+			nMax= _T("500");
+			page=_T("0");
+		}
+		CAtlString nMax;
+		CAtlString page;	//当前页面
+	};
+	class Query : public Pager
 	{
 	public:
 		Query()
 		{
 			rz = RZ_ALL;
-			nMax= _T("500");
-			page=_T("0");
+			
 		}
 		typedef enum{
 			RZ_YES,
@@ -61,8 +71,6 @@ public:
 		ZTRZ rz;	//认证
 		CAtlString ksrq;	//开始日期
 		CAtlString jsrq;	//结束日期
-		CAtlString nMax;
-		CAtlString page;	//当前页面
 	};
 	//勾选
 	class Gx
@@ -82,7 +90,7 @@ public:
 		CAtlString kprq;
 		ZT zt;
 	};
-	class Rz
+	class Rz : public Pager
 	{
 	public:
 		typedef enum{
@@ -92,12 +100,19 @@ public:
 		Rz()
 		{
 			zt = RZ_GX;
-			nMax= _T("500");
-			page=_T("0");
 		}
 		RZZT zt;	//认证状态
-		CAtlString nMax;
-		CAtlString page;	//当前页面
+	};
+	//统计查询
+	class Tj : public Pager
+	{
+	public:
+		CAtlString tjyf;
+		CAtlString fpdm;
+		CAtlString fphm;
+		CAtlString xfsbh;
+		CAtlString qrrzrq_q;
+		CAtlString qrrzrq_z;
 	};
 	class Log
 	{
@@ -136,15 +151,24 @@ public:
 	bool SubmitGx(const std::vector<Gx>& gx);
 	//查询勾选认证发票
 	bool QueryRzfp(const Rz& rz,std::string& out);
+	//统计查询
+	bool QueryDkcx(const Tj& tj,std::string& out);
 
 	const CAtlString& GetLastMsg();
 	void CopyData(const ChangRuan& cr);
 	void Release();
 	void EnableAutoQuit(bool b);
+	bool QueryQrgx();
+
 	const CAtlString& GetTaxNo() const	{
 		return m_tax;
 	}
-	bool QueryQrgx();
+	const CAtlString& GetDqrq() const {
+		return m_dqrq;
+	}
+	const CAtlString& GetLjrzs() const {
+		return m_ljrzs;
+	}
 protected:
 	bool SecondLogin();
 	bool SecondConfirmGx();
@@ -161,10 +185,12 @@ public:
 	CAtlString   m_ip;
 	CAtlString   m_pwd;
 	CAtlString   m_authCode;
-
+	//通过QueryQrgx接口获取
+	CAtlString   m_ljrzs;	//累计认证次数
+	CAtlString	 m_dqrq;	//当前时间
+	//
 	CAtlString   m_Ymbb;
 	CAtlString	 m_nsrmc;
-	CAtlString	 m_dqrq;
 	CAtlString   m_svrPacket;
 	CAtlString   m_svrRandom;
 	CAtlString   m_skssq;
@@ -196,7 +222,7 @@ namespace GxPt
 		CAtlString tm;		//时间
 		CAtlString zhangs;	//发票张数
 		CAtlString sehj;	//税额合计
-		CAtlString zt;		//状态 1-已过税款所属期 0-当前所属期 2未到税款所属期
+		CAtlString zt;		//状态 1-已申报 0-当前所属期 2-未申报
 		void clear(){
 			tm.Empty();
 			zhangs.Empty();
@@ -213,4 +239,6 @@ namespace GxPt
 	typedef std::map<CAtlString,RzTj,SortDesc> RzTjs;
 	//处理GetRzTjByNf 返回的key3值
 	void HandleRzTjByNf(const std::string& key3,RzTjs &out);
+
+	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret);
 }

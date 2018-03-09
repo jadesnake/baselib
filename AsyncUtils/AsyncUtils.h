@@ -82,6 +82,7 @@ namespace base{
 		};
 		BackLogicBase(HWND win);
 		virtual ~BackLogicBase(void);
+		void resetWin(HWND win);
 		virtual void start();
 		virtual void close();
 		virtual void stop();
@@ -99,6 +100,7 @@ namespace base{
 		void UpdateStatus(BackLogicBase::Status v);
 	protected:
 		virtual bool Run() = 0;
+		virtual void Done() = 0;
 	protected:
 		HWND	m_win;
 		HANDLE	m_thread;

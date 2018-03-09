@@ -33,6 +33,27 @@ namespace base
 			m_lstC.push_back(one);
 			m_lock.UnLock();
 		}
+		void assign( IListImpl<theItem,theLock> &inCopy)
+		{
+			m_lock.Lock();
+			inCopy.m_lock.Lock();
+
+			m_lstC.assign(inCopy.m_lstC.begin(),inCopy.m_lstC.end());
+
+			inCopy.m_lock.UnLock();
+			m_lock.UnLock();
+		}
+		void takeAll(IListImpl<theItem,theLock> &inCopy)
+		{
+			m_lock.Lock();
+			inCopy.m_lock.Lock();
+
+			m_lstC.assign(inCopy.m_lstC.begin(),inCopy.m_lstC.end());
+			inCopy.clear();
+			
+			inCopy.m_lock.UnLock();
+			m_lock.UnLock();
+		}
 		std::tr1::shared_ptr<theItem>	getLast() 
 		{
 			std::tr1::shared_ptr<theItem> ret;

@@ -23,24 +23,6 @@ bool ToWhat(std::string str,T &r)
 	r = tmp;
 	return true;
 }
-size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret)
-{
-	size_t sz = src.size();
-	std::string tmp;
-	size_t last = 0;  
-	size_t index=src.find_first_of(delim,last);  
-	while (index!=std::string::npos)  
-	{  
-		ret.push_back(src.substr(last,index-last));  
-		last=index+1;  
-		index=src.find_first_of(delim,last);  
-	}  
-	if (index-last>0)  
-	{  
-		ret.push_back(src.substr(last,index-last));  
-	} 
-	return ret.size();
-}
 BYTE TakeJson(std::string &inS)
 {
 	size_t bgnPos = inS.find('{');
@@ -52,13 +34,62 @@ BYTE TakeJson(std::string &inS)
 	inS = inS.substr(bgnPos,endPos-bgnPos+1);
 	return 0x00;
 }
+std::string BuildPagerJson(ChangRuan::Pager *p,int columns)
+{
+	Json::Value jsonRq;
+	std::string sColumns;
+	for(int n=1;n<columns;n++)
+	{
+		sColumns+=',';
+	}
+	for(int n=0;n<5;n++)
+	{
+		Json::Value tmp;
+		switch(n)
+		{
+		case 0:
+			tmp["name"]="sEcho";
+			tmp["value"]=1;
+			break;
+		case 1:
+			tmp["name"]="iColumns";
+			tmp["value"]=columns;
+			break;
+		case 2:
+			tmp["name"]="sColumns";
+			tmp["value"]=sColumns;
+			break;
+		case 3:
+			tmp["name"]="iDisplayStart";
+			tmp["value"]=_ttol(p->page)*_ttol(p->nMax); //0
+			break;
+		case 4:
+			tmp["name"]="iDisplayLength";
+			tmp["value"] = (char*)CT2CA(p->nMax);
+			break;
+		}
+		jsonRq.append(tmp);
+	}
+	for(int n=0;n<columns;n++)
+	{
+		Json::Value tmp;
+		CStringA name;
+		name.Format("mDataProp_%d",n);
+		tmp["name"]=name.GetString();
+		tmp["value"]=n;
+		jsonRq.append(tmp);
+	}
+	return jsonRq.toStyledString();
+}
+
 
 class ChangRuanDebug : public curl::CDebug
 {
 public:
-	ChangRuanDebug(ChangRuan::Log *log)
+	ChangRuanDebug(ChangRuan::Log *log,const std::string& method)
 	{
 		this->log = log;
+		this->method = method;
 	}
 	void OnCurlDbgRelease()
 	{
@@ -67,16 +98,20 @@ public:
 	void OnCurlDbgTrace(const std::stringstream& ss)
 	{
 		if(log)
+		{
+			log->OnOperator(method);
 			log->OnHttpTrace(ss);
+		}
 	}
 private:
 	ChangRuan::Log *log;
+	std::string method;
 };
 
-void CosplayIE(curl::CHttpClient *http,const CString& host,ChangRuan::Log *log)
+void CosplayIE(curl::CHttpClient *http,const CString& host,ChangRuan::Log *log,const std::string& method,long overTime=150000)
 {
-	http->SetDebug(new ChangRuanDebug(log));
-	http->SetTimeout(50000);
+	http->SetDebug(new ChangRuanDebug(log,method));
+	http->SetTimeout(overTime);
 	http->SetAgent(_T("Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; rv:11.0) like Gecko"));
 	http->AddHeader(_T("x-requested-with"),_T("XMLHttpRequest"));
 	http->AddHeader(_T("Accept-Language"),_T("zh-CN"));
@@ -156,7 +191,7 @@ ChangRuan::ChangRuan()
 {
 	m_log = NULL;
 	m_hasInitPwd  = false;
-	m_Ymbb = _T("3.0.11");
+	m_Ymbb = _T("3.0.12");
 	m_atuoQuit = true;
 }
 ChangRuan::~ChangRuan()
@@ -374,7 +409,7 @@ bool ChangRuan::Login(AREA area)
 		url = _T("https://fpdk.qh-n-tax.gov.cn");
 		break;
 	case NINGXIA:
-		url = _T("https://www.fpdk.nxgs.gov.cn");
+		url = _T("https://fpdk.nxgs.gov.cn");
 		break;
 	case XINJIANG:
 		url = _T("https://fpdk.xj-n-tax.gov.cn");
@@ -392,7 +427,7 @@ bool ChangRuan::Login(AREA area)
 	
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"Login",3);
 	http.AddParam("type","CLIENT-HELLO");
 	http.AddParam(_T("clientHello"),MakeClientHello());
 	http.AddParam("ymbb",(char*)CT2CA(m_Ymbb));
@@ -460,7 +495,7 @@ bool ChangRuan::SecondLogin()
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"SecondLogin");
 	http.AddParam("type","CLIENT-AUTH");
 	http.AddParam(_T("clientAuthCode"),m_authCode);
 	http.AddParam("password","");
@@ -512,7 +547,7 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"GetDkTjByDate");
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
@@ -568,7 +603,7 @@ bool ChangRuan::GetRzTjByNf(const CAtlString& nf,std::string &out)
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"GetRzTjByNf");
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
@@ -637,7 +672,7 @@ bool ChangRuan::GetQrGxBySsq(const CAtlString& ssq,std::string &out)
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"GetQrGxBySsq");
 	http.AddParam("id","querysbzt");
 	http.AddParam(_T("key1"),m_tax);
 	http.AddParam(_T("key2"),m_token);
@@ -692,7 +727,7 @@ bool ChangRuan::QueryQrgx()
 	url += _T("/SbsqWW/qrgx.do?callback=jQuery");
 	url += GetTickCount();
 	std::string rp;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"QueryQrgx");
 	http.AddParam("id","queryqrxx");
 	http.AddParam(_T("key1"),m_tax);
 	http.AddParam(_T("key2"),m_token);
@@ -718,6 +753,7 @@ bool ChangRuan::QueryQrgx()
 	}
 	if(key1=="01")
 	{
+		m_ljrzs = (TCHAR*)CA2CT(root["key2"].asString().c_str());
 		m_dqrq = (TCHAR*)CA2CT(root["key5"].asString().c_str());
 		m_token= (TCHAR*)CA2CT(root["key3"].asString().c_str());
 		m_lastMsg = OPT_SUCCESS;
@@ -736,7 +772,7 @@ bool ChangRuan::BeforeConfirmGx()
 	url += _T("/SbsqWW/hqssq.do?callback=jQuery");
 	url += GetTickCount();
 	std::string rp;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"BeforeConfirmGx");
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
@@ -810,7 +846,7 @@ bool ChangRuan::ConfirmGx()
 	referer += _T("/sbqr.08eaffb0.html");
 
 	std::string rp;
-	CosplayIE(&http,referer,m_log);
+	CosplayIE(&http,referer,m_log,"ConfirmGx");
 	http.AddParam("id","querysbzt");
 	http.AddParam(_T("key1"),m_tax);
 	http.AddParam(_T("key2"),m_token);
@@ -857,6 +893,7 @@ bool ChangRuan::ConfirmGx()
 		m_qrgxData.clear();
 		return SecondConfirmGx();
 	}
+	m_lastMsg = CodeToError(retS);
 	return false;
 }
 bool ChangRuan::SecondConfirmGx()
@@ -870,7 +907,7 @@ bool ChangRuan::SecondConfirmGx()
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"SecondConfirmGx");
 	http.AddParam("id","queryqrhz");
 	http.AddParam(_T("key1"),m_tax);
 	http.AddParam(_T("key2"),m_token);
@@ -907,7 +944,7 @@ bool ChangRuan::SecondConfirmGx()
 			{
 				//勾选提交成功ok
 				std::vector<std::string> smWhat;
-				if(!SplitBy(retS,'*',smWhat))
+				if(!GxPt::SplitBy(retS,'*',smWhat))
 				{
 					m_lastMsg = _T("二次确认 数据格式错误");
 					return false;
@@ -960,7 +997,7 @@ bool ChangRuan::ThirdConfirmGx(const std::string& p1,const std::string& p2)
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"ThirdConfirmGx");
 	http.AddParam("id","commitqrxx");
 	http.AddParam(_T("key1"),m_tax);
 	http.AddParam(_T("key2"),m_token);
@@ -1006,52 +1043,14 @@ bool ChangRuan::GetFpFromGx(const Query& q,std::string &out)
 	if(!crypCtrl)	return false;
 	if(m_ip.IsEmpty()) return false;
 
-	Json::Value jsonRq;
-	for(int n=0;n<5;n++)
-	{
-		Json::Value tmp;
-		switch(n)
-		{
-		case 0:
-			tmp["name"]="sEcho";
-			tmp["value"]=1;
-			break;
-		case 1:
-			tmp["name"]="iColumns";
-			tmp["value"]=14;
-			break;
-		case 2:
-			tmp["name"]="sColumns";
-			tmp["value"]=",,,,,,,,,,,,,";
-			break;
-		case 3:
-			tmp["name"]="iDisplayStart";
-			tmp["value"]=_ttol(q.page); //0
-			break;
-		case 4:
-			tmp["name"]="iDisplayLength";
-			tmp["value"] = (char*)CT2CA(q.nMax);
-			break;
-		}
-		jsonRq.append(tmp);
-	}
-	for(int n=0;n<14;n++)
-	{
-		Json::Value tmp;
-		CStringA name;
-		name.Format("mDataProp_%d",n);
-		tmp["name"]=name.GetString();
-		tmp["value"]=n;
-		jsonRq.append(tmp);
-	}
-	std::string aoData(jsonRq.toStyledString());
+	std::string aoData = BuildPagerJson(const_cast<Query*>(&q),14);
 	
 	CAtlString url(m_ip);
 	url += _T("/SbsqWW/gxcx.do?callback=jQuery");
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"GetFpFromGx");
 	http.AddParam("fpdm","");
 	http.AddParam("fphm","");
 	http.AddParam("xfsbh","");
@@ -1110,57 +1109,80 @@ bool ChangRuan::GetFpFromGx(const Query& q,std::string &out)
 		}
 		return true;
 	}
+	m_lastMsg = CodeToError(retcode);
+	return false;
+}
+bool ChangRuan::QueryDkcx(const Tj& tj,std::string& out)
+{
+	if(!crypCtrl)	return false;
+	if(m_ip.IsEmpty()) return false;
+	
+	std::string aoData = BuildPagerJson(const_cast<Tj*>(&tj),11);
+
+	CAtlString tmp;
+	CAtlString url(m_ip);
+	url += _T("/SbsqWW/dktj.do?callback=jQuery");
+	url += GetTickCount();
+	std::string rp;
+	curl::CHttpClient http;
+	CosplayIE(&http,m_ip,m_log,"QueryDkcx");
+	http.AddParam("aoData",aoData);
+	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam(_T("cert"),m_tax);
+	http.AddParam(_T("token"),m_token);
+	http.AddParam("oper","cx");
+	http.AddParam(_T("fpdm"),tj.fpdm);
+	http.AddParam(_T("fphm"),tj.fphm);
+	http.AddParam(_T("xfsbh"),tj.xfsbh);
+	http.AddParam(_T("qrrzrq_q"),tj.qrrzrq_q);
+	http.AddParam(_T("qrrzrq_z"),tj.qrrzrq_z);
+	http.AddParam("fply","0");
+	{
+		tmp = tj.tjyf;
+		tmp.Remove('-');
+		tmp = tmp.Mid(0,6);
+		http.AddParam(_T("tjyf"),tmp);
+	}
+	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(0x00!=TakeJson(rp))
+	{
+		m_lastMsg = OPT_DEF_ERROR;
+		return false;
+	}
+	Json::Value root;
+	Json::Reader parser;
+	if(!parser.parse(rp,root))
+	{
+		m_lastMsg = OPT_BAD_DATA;
+		return false;
+	}
+	std::string key1 = root["key1"].asString();
+	if(key1=="00")
+	{
+		m_lastMsg = _T("查询失败，请稍后再试！");
+		return false;
+	}
+	if(key1=="01")
+	{	
+		out = root["key2"].toStyledString();
+		m_token = CA2CT(root["key3"].asCString());
+		m_lastMsg = OPT_SUCCESS;
+		return true;
+	}
+	m_lastMsg = CodeToError(key1);
 	return false;
 }
 bool ChangRuan::QueryRzfp(const Rz& rz,std::string& out)
 {
 	if(!crypCtrl)	return false;
 	if(m_ip.IsEmpty()) return false;
-	Json::Value jsonRq;
-	for(int n=0;n<5;n++)
-	{
-		Json::Value tmp;
-		switch(n)
-		{
-		case 0:
-			tmp["name"]="sEcho";
-			tmp["value"]=1;
-			break;
-		case 1:
-			tmp["name"]="iColumns";
-			tmp["value"]=11;
-			break;
-		case 2:
-			tmp["name"]="sColumns";
-			tmp["value"]=",,,,,,,,,,";
-			break;
-		case 3:
-			tmp["name"]="iDisplayStart";
-			tmp["value"]=_ttol(rz.page); //0
-			break;
-		case 4:
-			tmp["name"]="iDisplayLength";
-			tmp["value"] = (char*)CT2CA(rz.nMax);
-			break;
-		}
-		jsonRq.append(tmp);
-	}
-	for(int n=0;n<11;n++)
-	{
-		Json::Value tmp;
-		CStringA name;
-		name.Format("mDataProp_%d",n);
-		tmp["name"]=name.GetString();
-		tmp["value"]=n;
-		jsonRq.append(tmp);
-	}
-	std::string aoData(jsonRq.toStyledString());
+	std::string aoData = BuildPagerJson(const_cast<Rz*>(&rz),11);
 	CAtlString url(m_ip);
 	url += _T("/SbsqWW/qrgx.do?callback=jQuery");
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"QueryRzfp");
 	http.AddParam("id","queryqrjg");
 	if(rz.zt==Rz::RZ_GX)
 		http.AddParam("qrzt","1");
@@ -1231,6 +1253,11 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 			zts += _T("0");
 		zts += _T("=");
 	}
+	if(zts.GetLength())
+	{
+		zts.Delete(zts.GetLength()-1);
+	}
+
 	if(fphms.IsEmpty()||fpdms.IsEmpty()||kprqs.IsEmpty()||zts.IsEmpty())
 	{
 		return false;
@@ -1241,7 +1268,7 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"SubmitGx");
 	http.AddParam(_T("fpdm"),fpdms);
 	http.AddParam(_T("fphm"),fphms);
 	http.AddParam(_T("kprq"),kprqs);
@@ -1287,7 +1314,7 @@ bool ChangRuan::Quit()
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log);
+	CosplayIE(&http,m_ip,m_log,"Quit");
 	http.AddParam(_T("cert"),m_tax);
 	rp	= http.RequestPost((char*)CT2CA(url),false);
 	if(0x00!=TakeJson(rp))
@@ -1411,6 +1438,7 @@ void ChangRuan::CopyData(const ChangRuan& cr)
 	m_Ymbb = cr.m_Ymbb;
 	m_nsrmc = cr.m_nsrmc;
 	m_dqrq = cr.m_dqrq;
+	m_ljrzs= cr.m_ljrzs;
 	m_svrPacket = cr.m_svrPacket;
 	m_svrRandom = cr.m_svrRandom;
 	m_atuoQuit = cr.m_atuoQuit;
@@ -1474,5 +1502,24 @@ namespace GxPt
 			}
 		}
 		return ;
-	}	
+	}
+
+	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret)
+	{
+		size_t sz = src.size();
+		std::string tmp;
+		size_t last = 0;  
+		size_t index=src.find_first_of(delim,last);  
+		while (index!=std::string::npos)  
+		{  
+			ret.push_back(src.substr(last,index-last));  
+			last=index+1;  
+			index=src.find_first_of(delim,last);  
+		}  
+		if (index-last>0)  
+		{  
+			ret.push_back(src.substr(last,index-last));  
+		} 
+		return ret.size();
+	}
 }

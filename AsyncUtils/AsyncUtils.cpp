@@ -86,6 +86,10 @@ namespace base
 			m_run = NULL;
 		}
 	}
+	void BackLogicBase::resetWin(HWND win)
+	{
+		m_win = win;
+	}
 	void BackLogicBase::start()
 	{
 		if(m_thread==NULL)
@@ -142,16 +146,18 @@ namespace base
 	}
 	DWORD BackLogicBase::ThreadProc(LPVOID p1)
 	{
+		
 		BackLogicBase *pT = reinterpret_cast<BackLogicBase*>(p1);
 		HANDLE events[10]={pT->m_quit,pT->m_run};
+		::CoInitialize(NULL);
+		::OleInitialize(NULL);
 		while(1)
 		{
 			bool bPost=false;
 			DWORD dwWait = WaitForMultipleObjects(2,events,FALSE,INFINITE);
 			if(dwWait==WAIT_OBJECT_0)
 			{
-				pT->UpdateStatus(FINISH);
-				return 0xdead;
+				break;
 			}
 			pT->UpdateStatus(WORKING);
 			bPost = pT->Run();
@@ -159,5 +165,10 @@ namespace base
 			if( bPost && pT->m_win)
 				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
 		}
+		pT->Done();
+		pT->UpdateStatus(FINISH);
+		::OleUninitialize();
+		::CoUninitialize();		
+		return 0xdead;
 	}
 }
