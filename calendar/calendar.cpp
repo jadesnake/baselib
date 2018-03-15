@@ -114,6 +114,11 @@ namespace base
 		_ftime(&t1);
 		return (t1.time * 1000 + t1.millitm);
 	}
+	bool Calendar::MinusDays(int v)
+	{
+		*this -= ATL::CTimeSpan(v,0,0,0);
+		return true;
+	}
 	bool Calendar::PlusMonth(int v)
 	{
 		int nY = 0;	//·­µÄÄêÊý
@@ -152,4 +157,57 @@ namespace base
 		}
 		return false;
 	}
+	SYSTEMTIME Calendar::ParseDateTime(const std::string& dt,const std::string& temp)
+	{
+		SYSTEMTIME sysTM;
+		memset(&sysTM,0,sizeof(SYSTEMTIME));
+		if(temp.size()==0)	return sysTM;
+		std::string year;
+		std::string month;
+		std::string day;
+		std::string hour;
+		std::string minut;
+		std::string second;	
+		int npos = 0;
+		for(size_t t=0;t<dt.size();t++)
+		{
+			char v = dt[t];
+			if( t > (temp.length()-1) )	break;
+			char f = temp.at(t);
+			if(f=='y')
+				year += v;
+			else if(f=='m')
+			{
+				if(temp[0]=='y'&&npos==1)
+					month += v;
+				else if(temp[0]=='h')
+					minut += v;
+			}
+			else if(f=='d')
+				day += v;
+			else if(f=='h')
+				hour += v;
+			else if(f=='s')
+				second += v;
+			if(v==f)
+			{
+				npos += 1;
+				continue;
+			}
+		}
+		if(year.size())
+			sysTM.wYear = atol(year.c_str());
+		if(month.size())
+			sysTM.wMonth= atol(month.c_str());
+		if(day.size())
+			sysTM.wDay  = atol(day.c_str());
+		if(hour.size())
+			sysTM.wHour  = atol(hour.c_str());
+		if(hour.size())
+			sysTM.wMinute  = atol(minut.c_str());
+		if(second.size())
+			sysTM.wSecond = atol(second.c_str());
+		return sysTM;
+	}
+
 }

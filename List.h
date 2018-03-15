@@ -11,6 +11,8 @@ namespace base
 		void Lock(){}
 		void UnLock(){}
 	};
+	//std::tr1::shared_ptr 管理的指针地址会变化
+	//
 	template< typename theItem,class theLock=Locker >
 	class IListImpl
 	{

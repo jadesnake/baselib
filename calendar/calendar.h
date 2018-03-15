@@ -22,9 +22,19 @@ namespace base{
 		Calendar& operator=( const Calendar& time);
 		bool PlusYear(int v);
 		bool PlusMonth(int v);
+		bool MinusDays(int v);
 		//获取当前时间精确到毫秒
 		static time_t CurrentTimeLarge();
 		bool ParseDateTime(LPCTSTR lpszDate);
+		//dt - 待解析数据
+		//temp - 日期模板 可选值：
+		//				yyyy-mm-dd hh:mm:ss
+		//				yy-mm-dd hh:mm:ss
+		//				hh:mm:ss
+		//				yyyy-mm-dd
+		//				yy-mm-dd
+		//	
+		static SYSTEMTIME ParseDateTime(const std::string& dt,const std::string& temp);
 	public:
 		//获取当前月天数
 		int GetMonthDays();
