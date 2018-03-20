@@ -553,7 +553,11 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 	http.AddParam(_T("ymbb"),m_Ymbb);
 	http.AddParam("oper","tj");
 	if(!date.IsEmpty())
-		http.AddParam(_T("tjyf"),date);
+	{
+		CAtlString tmp(date);
+		tmp.Remove('-');
+		http.AddParam(_T("tjyf"),tmp);
+	}
 	rp	= http.RequestPost((char*)CT2CA(url),false);
 	if(0x00!=TakeJson(rp))
 	{
@@ -581,7 +585,7 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 	if(retCode=="20")
 	{
 		m_token = (TCHAR*)CA2CT(root["key3"].asCString());
-		out = rp;
+		out = root["key2"].asString();
 		m_lastMsg = OPT_SUCCESS;
 		return true;
 	}
@@ -1172,6 +1176,62 @@ bool ChangRuan::QueryDkcx(const Tj& tj,std::string& out)
 	m_lastMsg = CodeToError(key1);
 	return false;
 }
+bool ChangRuan::QueryQrHzFp(const CAtlString& ssq,std::string& out)
+{
+	if(!crypCtrl)	return false;
+	if(m_ip.IsEmpty()) return false;
+	CAtlString url(m_ip);
+	url += _T("/SbsqWW/qrgx.do?callback=jQuery");
+	url += GetTickCount();
+	std::string rp;
+	curl::CHttpClient http;
+	CAtlString ssqV(ssq);
+	ssqV.Remove('-');
+	ssqV = ssqV.Mid(0,6);
+	if(ssqV.GetLength()<6)
+		return false;
+	CosplayIE(&http,m_ip,m_log,"QueryRzfp");
+	http.AddParam("id","querylsqrxx");
+	http.AddParam(_T("ssq"),ssqV);
+	http.AddParam(_T("key1"),m_tax);
+	http.AddParam(_T("key2"),m_token);
+	http.AddParam(_T("ymbb"),m_Ymbb);
+	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(0x00!=TakeJson(rp))
+	{
+		m_lastMsg = OPT_DEF_ERROR;
+		return false;
+	}
+	Json::Value root;
+	Json::Reader parser;
+	if(!parser.parse(rp,root))
+	{
+		m_lastMsg = OPT_BAD_DATA;
+		return false;
+	}
+	std::string key1 = root["key1"].asString();
+	if(key1=="00")
+	{
+		m_lastMsg = _T("查询发票信息出现异常，请稍后再试！");
+		return false;
+	}
+	if(key1=="01")
+	{
+		std::string token = root["key3"].asString();
+		m_token = CA2CT(token.c_str());
+		out = root["key2"].toStyledString();
+		size_t bgnPos = out.find('"');
+		size_t endPos = out.rfind('"');
+		if(bgnPos!=-1 && endPos!=-1)
+		{
+			out = out.substr(bgnPos+1,endPos-bgnPos-1);
+		}
+		m_lastMsg = OPT_SUCCESS;
+		return true;
+	}
+	m_lastMsg = CodeToError(key1);
+	return false;
+}
 bool ChangRuan::QueryRzfp(const Rz& rz,std::string& out)
 {
 	if(!crypCtrl)	return false;
@@ -1452,8 +1512,6 @@ void ChangRuan::EnableAutoQuit(bool b)
 {
 	m_atuoQuit = b;
 }
-
-
 namespace GxPt
 {
 	void HandleRzTjByNf(const std::string& key3,RzTjs &out)
@@ -1503,15 +1561,302 @@ namespace GxPt
 		}
 		return ;
 	}
+	/* 数据解析规则
+	function changeLslb() {
+	var e = $("#lsqslb").val().split("~"),
+	t = e[2].split("*");
+	本次为所属期-------begin
+	共勾选发票
+	$("#bcqrfpsl").text(t[0])
+	有效勾选发票
+	$("#bcyxgxsl").text(t[1])
+	勾选且扫描认证发票
+	$("#bcqrgxqrz").text(t[2])
+	勾选不可抵扣发票
+	$("#bcqrgxbkdk").text(t[3])
+	增值税专用发票 数量 金额 税额
+	$("#zpbcsl").text(t[4])	$("#zpbcje").text(t[5])	$("#zpbcse").text(t[6])
+	机动车发票 数量 金额 税额
+	$("#jdcbcsl").text(t[7]) $("#jdcbcje").text(t[8]) $("#jdcbcse").text(t[9])
+	货运发票 数量 金额 税额	
+	$("#hybcsl").text(t[10]) $("#hybcje").text(t[11]) $("#hybcse").text(t[12])
+	通行费发票 数量 金额 税额	
+	$("#txfbcsl").text(t[33]) $("#txfbcje").text(t[34]) $("#txfbcse").text(t[35]) 
+	合计 数量 金额 税额	
+	$("#hjbcsl").text(t[13]), $("#hjbcje").text(t[14]), $("#hjbcse").text(t[15]);
+	//截止本次勾选确认，共确认5 次，累计勾选34张发票，其中：
+	var s = token.split("~");
+	if("0" == s[0] || "5" == s[0] || "6" == s[0]){
+		截止本次勾选确认，有效勾选发票
+		$("#ljqryxgxsl").text(t[36])
+	}
+	else	{
+		截止本次勾选确认，有效勾选发票
+		$("#ljqryxgxsl").text(t[17])
 
+		$("#ljqrfpsl").text(t[16])
+		$("#ljqrgxqrz").text(t[18])
+		$("#ljqrgxbkdk").text(t[19])
+		累计有效勾选统计
+		增值税专用发票 数量 金额 税额
+		$("#zpljsl").text(t[20]) $("#zpljje").text(t[21]), $("#zpljse").text(t[22])
+		机动车发票 数量 金额 税额
+		$("#jdljcsl").text(t[23]) $("#jdljcje").text(t[24]) $("#jdljcse").text(t[25])
+		货运发票 数量 金额 税额	
+		$("#hyljsl").text(t[26]) $("#hyljje").text(t[27]) $("#hyljse").text(t[28]) 
+		合计 数量 金额 税额	
+		$("#hjljsl").text(t[29]) $("#hjljje").text(t[30]) $("#hjljse").text(t[31]) 
+		
+		"1" == t[32] ? $("#tjzt").html("当前状态：已完成") : $("#tjzt").html("当前状态：已提交")
+
+		通行费发票 数量 金额 税额	
+		$("#txfljsl").text(t[36]) $("#txfljje").text(t[37]) $("#txfljse").text(t[38]);
+	} 
+	}
+	*/
+	void HandleQrHzFp(const std::string& key2,QrHzFp &out)
+	{
+		if(key2.size()==0)	return ;
+		std::vector<std::string> o;
+		SplitBy(key2,'=',o);
+		for(size_t r = 0;r<o.size();r++)
+		{
+			QrHzFp::Qr qr;
+			std::vector<std::string> i;
+			SplitBy(o[r],'~',i);
+			qr.cs = CA2CT(i[1].c_str());
+			qr.tm = CA2CT(i[0].c_str());
+			{
+				QrHzFp::Hz zpbc;	//增值税专用发票
+				QrHzFp::Hz jdcbc;	//机动车发票
+				QrHzFp::Hz hybc;	//货运发票
+				QrHzFp::Hz txfbc;	//通行费发票
+				QrHzFp::Hz hjbc;	//合计
+				std::vector<std::string> v;
+				SplitBy(i[2],'*',v);
+				if( v.size()>=35 )
+				{
+					txfbc.column = QrHzFp::TX();
+					txfbc.sl = CA2CT(v[33].c_str());
+					txfbc.je = CA2CT(v[34].c_str());
+					txfbc.se = CA2CT(v[35].c_str());
+					qr.pushCurGxTj(txfbc);
+				}
+				if( v.size()>=15 )
+				{
+					zpbc.column = QrHzFp::ZP();
+					zpbc.sl = CA2CT(v[4].c_str());
+					zpbc.je = CA2CT(v[5].c_str());
+					zpbc.se = CA2CT(v[6].c_str());
+					qr.pushCurGxTj(zpbc);
+
+					jdcbc.column = QrHzFp::JDC();
+					jdcbc.sl = CA2CT(v[7].c_str());
+					jdcbc.je = CA2CT(v[8].c_str());
+					jdcbc.se = CA2CT(v[9].c_str());
+					qr.pushCurGxTj(jdcbc);
+
+					hybc.column = QrHzFp::HY();
+					hybc.sl = CA2CT(v[13].c_str());
+					hybc.je = CA2CT(v[14].c_str());
+					hybc.se = CA2CT(v[15].c_str());
+					qr.pushCurGxTj(hybc);
+
+					hjbc.column = QrHzFp::HJ();
+					hjbc.sl = CA2CT(v[13].c_str());
+					hjbc.je = CA2CT(v[14].c_str());
+					hjbc.se = CA2CT(v[15].c_str());
+					qr.pushCurGxTj(hjbc);
+				}
+				if( v.size()>=20 && v.size()<=40 )
+				{
+					zpbc.column = QrHzFp::ZP();
+					zpbc.sl = CA2CT(v[20].c_str());
+					zpbc.je = CA2CT(v[21].c_str());
+					zpbc.se = CA2CT(v[22].c_str());
+					qr.pushCountGxTj(zpbc);
+
+					jdcbc.column = QrHzFp::JDC();
+					jdcbc.sl = CA2CT(v[23].c_str());
+					jdcbc.je = CA2CT(v[24].c_str());
+					jdcbc.se = CA2CT(v[25].c_str());
+					qr.pushCountGxTj(jdcbc);
+
+					hybc.column = QrHzFp::HY();
+					hybc.sl = CA2CT(v[26].c_str());
+					hybc.je = CA2CT(v[27].c_str());
+					hybc.se = CA2CT(v[28].c_str());
+					qr.pushCountGxTj(hybc);
+					
+					hjbc.column = QrHzFp::HJ();
+					hjbc.sl = CA2CT(v[29].c_str());
+					hjbc.je = CA2CT(v[30].c_str());
+					hjbc.se = CA2CT(v[31].c_str());
+					qr.pushCountGxTj(hjbc);
+
+					txfbc.column = QrHzFp::TX();
+					txfbc.sl = CA2CT(v[36].c_str());
+					txfbc.je = CA2CT(v[37].c_str());
+					txfbc.se = CA2CT(v[38].c_str());
+					qr.pushCountGxTj(hjbc);
+				}
+			}
+			out.push(qr);
+		}
+	}
+	//
+	//处理抵扣统计数据
+	//原始数据
+	//01=34=1146135.96=140601.98=0=0=0=34=1146135.96=140601.98;
+	//02=0=0=0=0=0=0=0=0=0;
+	//03=0=0=0=0=0=0=0=0=0;
+	//14=0=0=0=0=0=0=0=0=0;
+	//99=34=1146135.96=140601.98=0=0=0=34=1146135.96=140601.98;
+	//
+	void HandleDkTj(const std::string& key2,DkTjs &out)
+	{
+		if(key2.size()==0)	return ;
+		std::vector<std::string> avg;
+		SplitBy(key2,';',avg);
+		for(size_t t=0;t<avg.size();t++)
+		{
+			std::vector<std::string> result;
+			SplitBy(avg[t],'=',result);
+			if(result.size()==0)	break;
+			DkTj dktj;
+			DkTj::Zu zuGx;	//勾选
+			DkTj::Zu zuSm;	//扫描
+			DkTj::Zu zuHj;	//合计
+			if(result[0]=="01")
+			{
+				dktj.label = _T("增值税专用发票");
+				
+				zuGx.label = _T("勾选认证");
+				zuGx.sl = CA2CT(result[1].c_str());
+				zuGx.je = CA2CT(result[2].c_str());
+				zuGx.se = CA2CT(result[3].c_str());
+				
+				zuSm.label = _T("扫描认证");
+				zuSm.sl = CA2CT(result[4].c_str());
+				zuSm.je = CA2CT(result[5].c_str());
+				zuSm.se = CA2CT(result[6].c_str());
+				
+				zuHj.label = _T("合计");
+				zuHj.sl = CA2CT(result[7].c_str());
+				zuHj.je = CA2CT(result[8].c_str());
+				zuHj.se = CA2CT(result[9].c_str());
+
+				dktj.push(zuGx);		
+				dktj.push(zuSm);
+				dktj.push(zuHj);
+			}
+			if(result[0]=="02")
+			{
+				dktj.label = _T("货物运输业增值税专用发票");
+				
+				zuGx.label = _T("勾选认证");
+				zuGx.sl = CA2CT(result[1].c_str());
+				zuGx.je = CA2CT(result[2].c_str());
+				zuGx.se = CA2CT(result[3].c_str());
+
+				zuSm.label = _T("扫描认证");
+				zuSm.sl = CA2CT(result[4].c_str());
+				zuSm.je = CA2CT(result[5].c_str());
+				zuSm.se = CA2CT(result[6].c_str());
+
+				zuHj.label = _T("合计");
+				zuHj.sl = CA2CT(result[7].c_str());
+				zuHj.je = CA2CT(result[8].c_str());
+				zuHj.se = CA2CT(result[9].c_str());
+
+				dktj.push(zuGx);		
+				dktj.push(zuSm);
+				dktj.push(zuHj);
+			}
+			if(result[0]=="03")
+			{
+				dktj.label = _T("机动车销售统一发票");
+
+				zuGx.label = _T("勾选认证");
+				zuGx.sl = CA2CT(result[1].c_str());
+				zuGx.je = CA2CT(result[2].c_str());
+				zuGx.se = CA2CT(result[3].c_str());
+
+				zuSm.label = _T("扫描认证");
+				zuSm.sl = CA2CT(result[4].c_str());
+				zuSm.je = CA2CT(result[5].c_str());
+				zuSm.se = CA2CT(result[6].c_str());
+
+				zuHj.label = _T("合计");
+				zuHj.sl = CA2CT(result[7].c_str());
+				zuHj.je = CA2CT(result[8].c_str());
+				zuHj.se = CA2CT(result[9].c_str());
+
+				dktj.push(zuGx);		
+				dktj.push(zuSm);
+				dktj.push(zuHj);
+			}
+			if(result[0]=="14")
+			{
+				dktj.label = _T("通行费发票");
+				zuGx.label = _T("勾选认证");
+				zuGx.sl = CA2CT(result[1].c_str());
+				zuGx.je = CA2CT(result[2].c_str());
+				zuGx.se = CA2CT(result[3].c_str());
+
+				zuSm.label = _T("扫描认证");
+				zuSm.sl = CA2CT(result[4].c_str());
+				zuSm.je = CA2CT(result[5].c_str());
+				zuSm.se = CA2CT(result[6].c_str());
+
+				zuHj.label = _T("合计");
+				zuHj.sl = CA2CT(result[7].c_str());
+				zuHj.je = CA2CT(result[8].c_str());
+				zuHj.se = CA2CT(result[9].c_str());
+
+				dktj.push(zuGx);		
+				dktj.push(zuSm);
+				dktj.push(zuHj);
+			}
+			if(result[0]=="99")
+			{
+				dktj.label = _T("总计");
+				zuGx.label = _T("勾选认证");
+				zuGx.sl = CA2CT(result[1].c_str());
+				zuGx.je = CA2CT(result[2].c_str());
+				zuGx.se = CA2CT(result[3].c_str());
+
+				zuSm.label = _T("扫描认证");
+				zuSm.sl = CA2CT(result[4].c_str());
+				zuSm.je = CA2CT(result[5].c_str());
+				zuSm.se = CA2CT(result[6].c_str());
+
+				zuHj.label = _T("合计");
+				zuHj.sl = CA2CT(result[7].c_str());
+				zuHj.je = CA2CT(result[8].c_str());
+				zuHj.se = CA2CT(result[9].c_str());
+
+				dktj.push(zuGx);		
+				dktj.push(zuSm);
+				dktj.push(zuHj);
+			}
+			if(dktj.fnZu.size())
+				out.push_back(dktj);						
+		}
+	}
+	//
 	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret)
 	{
 		size_t sz = src.size();
 		std::string tmp;
 		size_t last = 0;  
 		size_t index=src.find_first_of(delim,last);  
+		if(index==std::string::npos)
+		{
+			return 0;
+		}
 		while (index!=std::string::npos)  
-		{  
+		{
 			ret.push_back(src.substr(last,index-last));  
 			last=index+1;  
 			index=src.find_first_of(delim,last);  
@@ -1519,7 +1864,8 @@ namespace GxPt
 		if (index-last>0)  
 		{  
 			ret.push_back(src.substr(last,index-last));  
-		} 
+		}
 		return ret.size();
 	}
+	
 }

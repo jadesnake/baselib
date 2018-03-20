@@ -1,12 +1,9 @@
 #pragma once
 
-namespace base
+namespace ChinaAmount
 {
-	class ChinaAmount
-	{
-	public:
-		//rmb 小写转大写
-		static bool CapitalRMB(const CAtlString &inRmb,CAtlString &out);
-	};
-
-}
+	//rmb 小写转大写
+	bool CapitalRMB(const CAtlString &inRmb,CAtlString &out);
+	//数字小写转大写
+	CAtlString CapitalNumber(const CAtlString &inNum);
+};

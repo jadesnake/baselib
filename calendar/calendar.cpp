@@ -207,6 +207,8 @@ namespace base
 			sysTM.wMinute  = atol(minut.c_str());
 		if(second.size())
 			sysTM.wSecond = atol(second.c_str());
+		if(sysTM.wDay==0)
+			sysTM.wDay=1;
 		return sysTM;
 	}
 

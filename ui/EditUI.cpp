@@ -214,7 +214,14 @@ namespace CustomUI
 				hr = __super::TxSendMessage(msg,wparam,lparam,plresult);
 				if(pT->OnInputEvent)
 					pT->OnInputEvent(pT);
-				pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_TEXTCHANGED);
+				if(wparam==VK_RETURN && !pT->IsMultiLine())
+				{
+					pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_RETURN);
+				}
+				else
+				{
+					pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_TEXTCHANGED);
+				}
 			}
 			return hr;
 		}

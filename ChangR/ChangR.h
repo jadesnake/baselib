@@ -153,7 +153,9 @@ public:
 	bool QueryRzfp(const Rz& rz,std::string& out);
 	//统计查询
 	bool QueryDkcx(const Tj& tj,std::string& out);
-
+	//发票确认汇总查询
+	bool QueryQrHzFp(const CAtlString& ssq,std::string& out);
+	//
 	const CAtlString& GetLastMsg();
 	void CopyData(const ChangRuan& cr);
 	void Release();
@@ -215,6 +217,25 @@ private:
 //勾选平台
 namespace GxPt
 {
+	//抵扣统计数据
+	class DkTj
+	{
+	public:
+		class Zu
+		{
+		public:
+			CAtlString label;	//标签
+			CAtlString sl;		//数量
+			CAtlString se;		//税额
+			CAtlString je;		//金额
+		};
+		void push(const Zu& zu){
+			fnZu.push_back(zu);
+		}
+		std::vector<Zu>	fnZu;	//勾选，扫描，合计
+		CAtlString label;		//标签
+	};
+	typedef std::vector<DkTj> DkTjs; //抵扣统计数据
 	//首页认证统计数据
 	class RzTj
 	{
@@ -229,6 +250,63 @@ namespace GxPt
 			sehj.Empty();
 		}
 	};
+	//确认汇总数据
+	class QrHzFp
+	{
+	public:
+		static const TCHAR* ZP(){
+			return _T("增值税专用发票");
+		}
+		static const TCHAR* JDC(){
+			return _T("机动车发票");
+		}
+		static const TCHAR* HY(){
+			return _T("货运发票");
+		}
+		static const TCHAR* TX(){
+			return _T("通行费发票");
+		}
+		static const TCHAR* HJ(){
+			return _T("合计");
+		}
+		class Hz
+		{
+		public:
+			CAtlString column;
+			CAtlString sl;	//数量
+			CAtlString je;	//金额
+			CAtlString se;	//税额
+		};
+		typedef std::map<CAtlString,Hz> HashHz;	//汇总数据
+		class Qr
+		{
+		public:
+			CAtlString cs;	//第几次确认
+			CAtlString tm;	//确认时间
+			HashHz curGxTj;	//本次有效勾选统计
+			HashHz countGxTj;  //累计有效勾选统计
+			inline void pushCurGxTj(const Hz& hz){
+				curGxTj.insert( std::make_pair(hz.column,hz) );
+			}
+			inline void pushCountGxTj(const Hz& hz){
+				countGxTj.insert( std::make_pair(hz.column,hz) );
+			}
+			Hz getHzByKey(const TCHAR *key){
+				Hz ret;
+				HashHz::iterator it = countGxTj.find(key);
+				if(it != countGxTj.end())
+					ret = it->second;
+				return ret;
+			}
+		};
+		inline void push(const Qr& qr){
+			qrs.push_back(qr);
+		}		
+	public:
+		std::vector<Qr> qrs;
+	
+	};
+	//
 	struct SortDesc
 	{
 		bool operator()(const CAtlString& k1,const CAtlString& k2)const
@@ -239,6 +317,11 @@ namespace GxPt
 	typedef std::map<CAtlString,RzTj,SortDesc> RzTjs;
 	//处理GetRzTjByNf 返回的key3值
 	void HandleRzTjByNf(const std::string& key3,RzTjs &out);
-
+	//处理QueryQrHzFp 返回的key2值
+	void HandleQrHzFp(const std::string& key2,QrHzFp &out);
+	//处理抵扣统计数据
+	void HandleDkTj(const std::string& key2,DkTjs &out);
+	//
 	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret);
+	
 }

@@ -40,6 +40,14 @@ namespace CustomUI
 		{
 			return new TemplateClick<DuiLib::CTextUI>();
 		}
+		if(_tcscmp(pstrClass,_T("CustomUI::ListHeaderItemUI"))==0)
+		{
+			return new CustomUI::ListHeaderItemUI;
+		}
+		if(_tcscmp(pstrClass,_T("CustomUI::CListHeaderUI"))==0)
+		{
+			return new CustomUI::CListHeaderUI;
+		}
 		return base->CreateControl(pstrClass);
 	}
 	//ÊôĞÔ½Ó¿Ú
