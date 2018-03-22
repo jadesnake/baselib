@@ -176,13 +176,10 @@ namespace base
 			char f = temp.at(t);
 			if(f=='y')
 				year += v;
+			else if(f=='M')
+				month += v;
 			else if(f=='m')
-			{
-				if(temp[0]=='y'&&npos==1)
-					month += v;
-				else if(temp[0]=='h')
-					minut += v;
-			}
+				minut += v;
 			else if(f=='d')
 				day += v;
 			else if(f=='h')

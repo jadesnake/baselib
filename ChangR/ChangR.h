@@ -107,12 +107,12 @@ public:
 	class Tj : public Pager
 	{
 	public:
-		CAtlString tjyf;
-		CAtlString fpdm;
-		CAtlString fphm;
-		CAtlString xfsbh;
-		CAtlString qrrzrq_q;
-		CAtlString qrrzrq_z;
+		CAtlString tjyf;	//值：201802
+		CAtlString fpdm;	//null
+		CAtlString fphm;	//null
+		CAtlString xfsbh;	//null
+		CAtlString qrrzrq_q;	//确认认证日期起
+		CAtlString qrrzrq_z;	//确认认证日期止
 	};
 	class Log
 	{
@@ -146,7 +146,9 @@ public:
 	//根据税款所属期查询
 	bool GetQrGxBySsq(const CAtlString& ssq,std::string &out);
 	//确认勾选
-	bool ConfirmGx();
+	bool ConfirmGx(std::string &out);
+	bool ConfirmGxEnd();
+
 	//保存勾选状态
 	bool SubmitGx(const std::vector<Gx>& gx);
 	//查询勾选认证发票
@@ -173,7 +175,7 @@ public:
 	}
 protected:
 	bool SecondLogin();
-	bool SecondConfirmGx();
+	bool SecondConfirmGx(std::string &out);
 	bool ThirdConfirmGx(const std::string& p1,const std::string& p2);
 
 	CAtlString MakeClientAuthCode(const CAtlString& svrPacket);
@@ -213,10 +215,37 @@ private:
 
 	bool m_atuoQuit;
 	bool m_hasInitPwd;
+	std::string m_ljhzxxfs;
+	std::string m_signature;		
 };
 //勾选平台
 namespace GxPt
 {
+	//勾选认证数据
+	class RzGx
+	{
+	public:
+		class Zu
+		{
+		public:
+			CAtlString label;	//标签
+			CAtlString sl;		//数量
+			CAtlString se;		//税额
+			CAtlString je;		//金额
+		};
+		void push(const RzGx::Zu& zu)
+		{
+			fnZu.push_back(zu);
+		}
+		CAtlString ssq;			//所属期
+		CAtlString qrgxsl;		//第几次确认勾选
+		CAtlString bcqrfpsl;	//勾选发票数
+		CAtlString bcyxgxsl;	//有效勾选发票
+		CAtlString bcqrgxqrz;	//勾选且扫描认证发票
+		CAtlString bcqrgxbkdk;	//勾选不可抵扣发票
+		std::vector<Zu>	fnZu;	//增值税专用发票,机动车发票,货运发票 等		
+	};
+
 	//抵扣统计数据
 	class DkTj
 	{
@@ -321,6 +350,8 @@ namespace GxPt
 	void HandleQrHzFp(const std::string& key2,QrHzFp &out);
 	//处理抵扣统计数据
 	void HandleDkTj(const std::string& key2,DkTjs &out);
+	//
+	void HandleFirstConfirm(const std::string& json,RzGx &cur,RzGx &dq);
 	//
 	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret);
 	

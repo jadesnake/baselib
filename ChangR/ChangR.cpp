@@ -607,14 +607,13 @@ bool ChangRuan::GetRzTjByNf(const CAtlString& nf,std::string &out)
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log,"GetRzTjByNf");
+	CosplayIE(&http,m_ip,m_log,"GetRzTjByNf",5);
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
 	if(!nf.IsEmpty())
 		http.AddParam(_T("rznf"),nf);
 	rp	= http.RequestPost((char*)CT2CA(url),false);
-
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -760,6 +759,7 @@ bool ChangRuan::QueryQrgx()
 		m_ljrzs = (TCHAR*)CA2CT(root["key2"].asString().c_str());
 		m_dqrq = (TCHAR*)CA2CT(root["key5"].asString().c_str());
 		m_token= (TCHAR*)CA2CT(root["key3"].asString().c_str());
+		//key6下个月
 		m_lastMsg = OPT_SUCCESS;
 		return true;
 	}
@@ -805,7 +805,7 @@ bool ChangRuan::BeforeConfirmGx()
 	m_lastMsg = CodeToError(key1);
 	return false;
 }
-bool ChangRuan::ConfirmGx()
+bool ChangRuan::ConfirmGx(std::string &out)
 {
 	if(!crypCtrl)	return false;
 	if(m_ip.IsEmpty()) return false;
@@ -813,6 +813,7 @@ bool ChangRuan::ConfirmGx()
 	{
 		if(!BeforeConfirmGx())
 			return false;
+		Sleep(100);
 		if(!QueryQrgx())
 			return false;
 	}
@@ -880,7 +881,13 @@ bool ChangRuan::ConfirmGx()
 	else if(retO=="3" && retS=="01")
 	{
 		m_qrgxData.clear();
-		return SecondConfirmGx();
+		bool bRet = SecondConfirmGx(out);
+		Json::Value ret;
+		parser.parse(out,ret);
+		ret["qrljcs"]=(char*)CT2CA(m_ljrzs);	//第几次确认勾选
+		ret["ssq"] = (char*)CT2CA(m_cookssq);
+		out = ret.toStyledString();
+		return bRet;
 	}
 	if (retS=="01" && retO=="2") 
 	{
@@ -890,17 +897,37 @@ bool ChangRuan::ConfirmGx()
 	if( retS=="01" && retO=="1") 
 	{
 		m_qrgxData.clear();
-		return SecondConfirmGx();
+		bool bRet = SecondConfirmGx(out);
+		Json::Value ret;
+		parser.parse(out,ret);
+		ret["qrljcs"]=(char*)CT2CA(m_ljrzs);	//第几次确认勾选
+		ret["ssq"] = (char*)CT2CA(m_cookssq);
+		out = ret.toStyledString();
+		return bRet;
 	}
 	if( retS=="01" && retO=="4") 
 	{
 		m_qrgxData.clear();
-		return SecondConfirmGx();
+		bool bRet = SecondConfirmGx(out);
+		Json::Value ret;
+		parser.parse(out,ret);
+		ret["qrljcs"]=(char*)CT2CA(m_ljrzs);	//第几次确认勾选
+		ret["ssq"] = (char*)CT2CA(m_cookssq);
+		out = ret.toStyledString();
+		return bRet;
 	}
 	m_lastMsg = CodeToError(retS);
 	return false;
 }
-bool ChangRuan::SecondConfirmGx()
+bool ChangRuan::ConfirmGxEnd()
+{
+	if(!crypCtrl)	return false;
+	if(m_ip.IsEmpty()) return false;
+	if(m_ljhzxxfs.size()==0)	return false;
+	if(m_signature.size()==0)	return false;
+	return ThirdConfirmGx(m_ljhzxxfs,m_signature);
+}
+bool ChangRuan::SecondConfirmGx(std::string &out)
 {
 	if(!crypCtrl)	return false;
 	if(m_ip.IsEmpty()) return false;
@@ -942,6 +969,11 @@ bool ChangRuan::SecondConfirmGx()
 	if (retT=="01") 
 	{
 		m_token = CA2CT(token.c_str());
+		Json::Value jsonOut;
+		jsonOut["key2"] = retS;
+		jsonOut["key4"] = retO;
+		jsonOut["key5"] = retR;
+		out = jsonOut.toStyledString();
 		if(!retS.empty())
 		{
 			if(atol(retO.c_str())>0)
@@ -953,14 +985,16 @@ bool ChangRuan::SecondConfirmGx()
 					m_lastMsg = _T("二次确认 数据格式错误");
 					return false;
 				}
-				std::string ljhzxxfs = smWhat[1];
-				std::string signature = smWhat[2];				
-				if(ThirdConfirmGx(ljhzxxfs,signature))
+				m_ljhzxxfs = smWhat[1];
+				m_signature = smWhat[2];
+				/*
+				进项管理需要展示数据不能自动提交
+				if(ThirdConfirmGx(m_ljhzxxfs,m_signature))
 				{
 					m_lastMsg = _T("当前状态：待提交");
 					return true;
-				}
-				return false;
+				}*/
+				return true;
 			}
 			else
 			{
@@ -1843,6 +1877,71 @@ namespace GxPt
 			if(dktj.fnZu.size())
 				out.push_back(dktj);						
 		}
+	}
+	/*
+	当前
+	勾选发票数 有效勾选发票 勾选且扫描认证发票 勾选不可抵扣发票 增值税专用发票   金额   税额  机动车发票 金额  税额  货运发票 金额   税额 合计 金额    税额   通行费  金额   税额
+	1         1            0               0                1         780.54 46.83  0        0.00  0.00  0       0.00  0.00  1  780.54  46.83  0      0.00  0.00
+	累计
+	1~1~0~0~1~780.54~46.83~0~0.00~0.00~0~0.00~0.00~1~780.54~46.83~0~0.00~0.00
+	*/
+	void HandleFirstConfirm(const std::string& json,RzGx &cur,RzGx &dq)
+	{
+		Json::Value  root;
+		Json::Reader reader;
+		if(!reader.parse(json,root))	return ;
+		Json::Value s = root["key2"];
+		cur.qrgxsl = root["qrljcs"].asCString();
+		dq.qrgxsl = root["qrljcs"].asCString();
+		
+		std::vector<std::string> ssq;
+		SplitBy(root["ssq"].asCString(),';',ssq);
+		cur.ssq = ssq[0].c_str();
+		dq.ssq = ssq[0].c_str();
+
+		std::vector<std::string> i;
+		SplitBy(s.asCString(),'*',i);
+		if(i.size()==0)	return ;
+		//0 当前勾选
+		for(size_t szI=0;szI<i.size();szI++)
+		{
+			std::vector<std::string> a;
+			SplitBy(i[szI],'~',a);
+			if(a.size()==0)	continue;
+			RzGx *pOut = (szI==0?&cur:&dq);
+			pOut->bcqrfpsl = a[0].c_str();
+			pOut->bcyxgxsl = a[1].c_str();
+			pOut->bcqrgxqrz= a[2].c_str();
+			pOut->bcqrgxbkdk= a[3].c_str();
+			for(int nxt=4;nxt<a.size();)
+			{
+				RzGx::Zu zu;
+				if(nxt==4)
+					zu.label=_T("增值税专用发票");
+				else if(nxt==7)
+					zu.label=_T("机动车发票");
+				else if(nxt==10)
+					zu.label=_T("货运发票");
+				else if(nxt==10)
+					zu.label=_T("货运发票");
+				else if(nxt==13)
+					zu.label=_T("合计");
+				else if(nxt==16)
+					zu.label=_T("通行费发票");
+
+				zu.sl =  a[nxt].c_str();
+				nxt += 1;
+
+				zu.je =  a[nxt].c_str();
+				nxt += 1;
+
+				zu.se =  a[nxt].c_str();
+				nxt += 1;
+
+				pOut->push(zu);
+			}
+		}		
+		return ;
 	}
 	//
 	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret)

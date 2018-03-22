@@ -28,11 +28,12 @@ namespace base{
 		bool ParseDateTime(LPCTSTR lpszDate);
 		//dt - 待解析数据
 		//temp - 日期模板 可选值：
-		//				yyyy-mm-dd hh:mm:ss
-		//				yy-mm-dd hh:mm:ss
+		//				yyyy-MM-dd hh:mm:ss
+		//				yy-MM-dd hh:mm:ss
 		//				hh:mm:ss
-		//				yyyy-mm-dd
-		//				yy-mm-dd
+		//				yyyy-MM-dd
+		//				yy-MM-dd
+		//				yyyyMMdd
 		//	
 		static SYSTEMTIME ParseDateTime(const std::string& dt,const std::string& temp);
 	public:
