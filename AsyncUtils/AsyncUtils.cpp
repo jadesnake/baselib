@@ -96,7 +96,8 @@ namespace base
 		{
 			m_quit = ::CreateEvent(NULL,FALSE,FALSE,NULL);
 			m_run = ::CreateEvent(NULL,FALSE,FALSE,NULL);
-			m_thread = ::CreateThread(NULL,0,(LPTHREAD_START_ROUTINE)&BackLogicBase::ThreadProc,this,0,NULL);
+			//m_thread = ::CreateThread(NULL,0,(LPTHREAD_START_ROUTINE),0,NULL);
+			m_thread = (HANDLE)_beginthreadex(NULL,0,&BackLogicBase::ThreadProc,this,0,NULL);
 		}
 		::SetEvent(m_run);
 	}
@@ -144,7 +145,7 @@ namespace base
 		CLockGuard lock(&m_lockError);
 		m_error = v;
 	}
-	DWORD BackLogicBase::ThreadProc(LPVOID p1)
+	unsigned int BackLogicBase::ThreadProc(void* p1)
 	{
 		
 		BackLogicBase *pT = reinterpret_cast<BackLogicBase*>(p1);
@@ -169,6 +170,7 @@ namespace base
 		pT->UpdateStatus(FINISH);
 		::OleUninitialize();
 		::CoUninitialize();		
+		_endthreadex(0xdead);
 		return 0xdead;
 	}
 }

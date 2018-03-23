@@ -96,7 +96,7 @@ namespace base{
 			return NULL;
 		}
 	private:
-		static DWORD WINAPI ThreadProc(LPVOID p1);
+		static unsigned int WINAPI ThreadProc(void* p1);
 		void UpdateStatus(BackLogicBase::Status v);
 	protected:
 		virtual bool Run() = 0;
