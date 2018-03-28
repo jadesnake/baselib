@@ -223,6 +223,36 @@ bool ChangRuan::Init()
 	m_lastMsg = OPT_SUCCESS;
 	return true;
 }
+bool ChangRuan::CheckEnv()
+{
+	HRESULT hr = 0;
+	CComPtr<_CryptCtl> crypTmp;
+	hr = crypTmp.CoCreateInstance(__uuidof(CryptCtl));
+	if(!SUCCEEDED(hr))
+	{
+		if(SUCCEEDED(hr))
+			hr = crypCtrl.CoCreateInstance(__uuidof(CryptCtl));
+		m_lastMsg = _T("组件获取失败");
+		return false;
+	}
+	if(crypTmp->IsDeviceOpened())
+		crypTmp->CloseDevice();
+	_bstr_t sNull;
+	long code=0;
+	crypTmp->OpenDeviceEx(sNull);
+	code = crypTmp->ErrCode;
+	if(code!=0&&code!=-1&&code!=87)
+	{
+		//异常
+		if(code==167||code==187)
+			m_lastMsg = _T("未安装驱动");
+		crypTmp->CloseDevice();
+		crypTmp.Release();
+		return false;
+	}
+	m_lastMsg = OPT_SUCCESS;
+	return true;
+}
 bool ChangRuan::CheckPwd(const CAtlString& pwd)
 {
 	if(!crypCtrl)	return false;
@@ -1468,6 +1498,46 @@ bool ChangRuan::Quit()
 	m_lastMsg=CodeToError(rezt);
 	return false;
 }
+bool ChangRuan::QueryQy(std::string& out)
+{
+	if(!crypCtrl)	return false;
+	if(m_ip.IsEmpty()) return false;
+	CAtlString url(m_ip);
+	url += _T("/SbsqWW/nsrcx.do?callback=jQuery");
+	url += GetTickCount();
+
+	std::string rp;
+	curl::CHttpClient http;
+	CosplayIE(&http,m_ip,m_log,"QueryQy");
+	http.AddParam(_T("cert"),m_tax);
+	http.AddParam(_T("token"),m_token);
+	http.AddParam(_T("ymbb"),m_Ymbb);
+	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(0x00!=TakeJson(rp))
+	{
+		m_lastMsg = _T("请先退出系统");
+		return false;
+	}
+	std::string rezt;
+	Json::Value root;
+	Json::Reader parser;
+	if(!parser.parse(rp,root))
+	{
+		m_lastMsg = _T("数据格式解析错误");
+		return false;
+	}
+	rezt = root["key1"].asCString();
+	if(rezt=="01")
+	{
+		m_lastMsg = OPT_SUCCESS;
+		out = root["key2"].asCString();
+		m_token = CA2CT(root["key3"].asCString());
+		return true;
+	}
+	m_lastMsg=CodeToError(rezt);
+	return false;
+	return false;
+}
 void ChangRuan::Release()
 {
 	//CloseDev();
@@ -1477,6 +1547,7 @@ void ChangRuan::Release()
 		crypCtrl.Release();
 	}
 }
+
 CAtlString ChangRuan::MakeClientAuthCode(const CAtlString& svrPacket)
 {
 	CAtlString ret;
@@ -1976,6 +2047,40 @@ namespace GxPt
 				pOut->push(zu);
 			}
 		}		
+		return ;
+	}
+	//
+	//"%E6%9D%AD%E5%B7%9E%E7%88%B1%E4%BF%A1%E8%AF%BA%E8%88%AA%E5%A4%A9%E4%BF%A1%E6%81%AF%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8=0======330100555199156=A=0=91330106555199156Q=ZC"
+	//
+	void HandleQy(const std::string& json,const std::string& token,Usr &out)
+	{
+		curl::CHttpClient http;
+		std::vector<std::string> infoArr;
+		std::string tmp;
+		if(0==SplitBy(json,'=',infoArr))	return ;
+		tmp = http.DecodeUrl(infoArr[0]);
+		out.qymc = CA2CT(tmp.c_str(),CP_UTF8);
+		if(infoArr[1]=="0")
+			out.sbzq=_T("月");
+		else
+			out.sbzq=_T("季");
+		{
+			std::vector<std::string> tokArr;
+			SplitBy(token,'~',tokArr);
+			if(tokArr[1]=="1"){
+				out.qylx = _T("生产企业");
+			}else if(tokArr[1]=="2"){
+				out.qylx = _T("外贸企业");
+			}else if(tokArr[1]=="3"){
+				out.qylx = _T("外综服企业");
+			}else{
+				out.qylx = _T("-");
+			}
+		}
+		out.oldsh = infoArr[7].c_str();
+		out.qysh = infoArr[10].c_str();
+		out.level= infoArr[8].c_str();
+		//out.nsdq = infoArr[11].c_str();
 		return ;
 	}
 	//

@@ -36,12 +36,12 @@ namespace CustomUI
 	}
 	void EditUI::Init()
 	{
+		__super::DoInit();
 		if(IsPasswordMode())
 		{
 			m_pTwh->SetPasswordChar(L'¡ñ');
 			EnableIME(false);
-		}
-		__super::DoInit();
+		}		
 	}
 	void EditUI::OnTxNotify(DWORD iNotify, void *pv)
 	{
@@ -214,7 +214,7 @@ namespace CustomUI
 				hr = __super::TxSendMessage(msg,wparam,lparam,plresult);
 				if(pT->OnInputEvent)
 					pT->OnInputEvent(pT);
-				if(wparam==VK_RETURN && !pT->IsMultiLine())
+				if(m_bWantReturn==false&&wparam==VK_RETURN && !pT->IsMultiLine())
 				{
 					pT->GetManager()->SendNotify(pT,DUI_MSGTYPE_RETURN);
 				}

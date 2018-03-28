@@ -125,6 +125,7 @@ public:
 
 	ChangRuan();
 	virtual ~ChangRuan();
+	bool CheckEnv();
 	void SetLog(Log *log);
 	bool IsInitAndPwd();
 	void SetPwd(const CAtlString& pwd);
@@ -157,6 +158,8 @@ public:
 	bool QueryDkcx(const Tj& tj,std::string& out);
 	//发票确认汇总查询
 	bool QueryQrHzFp(const CAtlString& ssq,std::string& out);
+	//获取企业信息
+	bool QueryQy(std::string& out);	
 	//
 	const CAtlString& GetLastMsg();
 	void CopyData(const ChangRuan& cr);
@@ -172,6 +175,9 @@ public:
 	}
 	const CAtlString& GetLjrzs() const {
 		return m_ljrzs;
+	}
+	const CAtlString& GetToken() const {
+		return m_token;
 	}
 protected:
 	bool SecondLogin();
@@ -221,6 +227,18 @@ private:
 //勾选平台
 namespace GxPt
 {
+	//用户信息
+	class Usr
+	{
+	public:
+		CAtlString level; //用户级别
+		CAtlString qylx;  //企业类型
+		CAtlString qymc;  //企业名称
+		CAtlString sbzq;  //申报周期
+		CAtlString qysh;  //企业税号
+		CAtlString oldsh; //旧税号
+		CAtlString nsdq;  //纳税地区
+	};
 	//勾选认证数据
 	class RzGx
 	{
@@ -352,6 +370,8 @@ namespace GxPt
 	void HandleDkTj(const std::string& key2,DkTjs &out);
 	//
 	void HandleFirstConfirm(const std::string& json,RzGx &cur,RzGx &dq);
+	//
+	void HandleQy(const std::string& json,const std::string& token,Usr &out);
 	//
 	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret);
 	

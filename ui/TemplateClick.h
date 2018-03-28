@@ -18,7 +18,6 @@ namespace CustomUI
 			m_dwFocusedTextColor = 0;
 			m_dwHotBorderColor = 0;
 			m_dwHotBorderColor  = 0;
-			Control::SetTextStyle(Control::GetTextStyle()|DT_SINGLELINE);
 		}
 		virtual ~TemplateClick()
 		{
@@ -167,7 +166,7 @@ namespace CustomUI
 			else
 			{
 				DuiLib::CRenderEngine::DrawText(m_pManager->GetPaintDC(),
-					m_pManager, rcText, Control::GetText(), 0, Control::GetFont(), DT_CALCRECT | Control::GetTextStyle());
+					m_pManager, rcText, Control::GetText(), 0, Control::GetFont(), DT_CALCRECT|Control::GetTextStyle());
 			}
 			SIZE ret;
 			ret = Control::EstimateSize(szAvailable);
@@ -227,7 +226,11 @@ namespace CustomUI
 				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
 				SetHotBorderColor(clrColor);
 			}
-			else 
+			else if( _tcscmp(pstrName, _T("singleline")) == 0 )
+			{
+				Control::SetTextStyle(Control::GetTextStyle()|DT_SINGLELINE);
+			}
+			else
 				Control::SetAttribute(pstrName,pstrValue);
 		}
 		LPVOID GetInterface(LPCTSTR pstrName)
