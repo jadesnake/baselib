@@ -469,9 +469,16 @@ namespace curl {
 	{
 		bool chunked = false;
 		char line[512];
+		m_headbuf.seekp(0);
+		m_headbuf.seekg(0);
 		while(m_headbuf.getline(line,sizeof(line)))
 		{
 			if(0==strcmp(strlwr(line),"transfer-encoding: chunked\r"))
+			{
+				chunked = true;
+				break;
+			}
+			else if(0==strcmp(strlwr(line),"headertransfer-encoding: chunked\r"))
 			{
 				chunked = true;
 				break;
@@ -542,6 +549,8 @@ namespace curl {
 		bool error = false;
 		long nChuck = -1;
 		char line[512];
+		m_wbuf.seekp(0);
+		m_wbuf.seekg(0);
 		while(!m_wbuf.eof())
 		{
 			memset(line,0,sizeof(line));

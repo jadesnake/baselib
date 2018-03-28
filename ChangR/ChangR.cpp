@@ -547,7 +547,7 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log,"GetDkTjByDate");
+	CosplayIE(&http,m_ip,m_log,"GetDkTjByDate",3000);
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
@@ -607,13 +607,20 @@ bool ChangRuan::GetRzTjByNf(const CAtlString& nf,std::string &out)
 	url += GetTickCount();
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log,"GetRzTjByNf",5);
+	CosplayIE(&http,m_ip,m_log,"GetRzTjByNf",3000);
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
 	if(!nf.IsEmpty())
 		http.AddParam(_T("rznf"),nf);
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(http.IsResponseChunk())
+	{
+		rp.clear();
+		std::vector<std::string> chuncks = http.GetChunks();
+		for(size_t t=0;t<chuncks.size();t++)
+			rp += chuncks[t];
+	}
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -682,6 +689,13 @@ bool ChangRuan::GetQrGxBySsq(const CAtlString& ssq,std::string &out)
 	http.AddParam(_T("ymbb"),m_Ymbb);
 	http.AddParam(_T("ssq"),ssq);
 	rp	= http.RequestPost((char*)CT2CA(m_ip),false);
+	if(http.IsResponseChunk())
+	{
+		rp.clear();
+		std::vector<std::string> chuncks = http.GetChunks();
+		for(size_t t=0;t<chuncks.size();t++)
+			rp += chuncks[t];
+	}
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -736,6 +750,13 @@ bool ChangRuan::QueryQrgx()
 	http.AddParam(_T("key2"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(http.IsResponseChunk())
+	{
+		rp.clear();
+		std::vector<std::string> chuncks = http.GetChunks();
+		for(size_t t=0;t<chuncks.size();t++)
+			rp += chuncks[t];
+	}
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg.Format(_T("QueryQrgx %s"),OPT_DEF_ERROR);
@@ -1119,6 +1140,13 @@ bool ChangRuan::GetFpFromGx(const Query& q,std::string &out)
 		m_lastMsg = OPT_DEF_ERROR;
 		return false;
 	}
+	if(http.IsResponseChunk())
+	{
+		rp.clear();
+		std::vector<std::string> chuncks = http.GetChunks();
+		for(size_t t=0;t<chuncks.size();t++)
+			rp += chuncks[t];
+	}
 	TakeJson(rp);
 	Json::Value root;
 	Json::Reader parser;
@@ -1182,6 +1210,13 @@ bool ChangRuan::QueryDkcx(const Tj& tj,std::string& out)
 		http.AddParam(_T("tjyf"),tmp);
 	}
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(http.IsResponseChunk())
+	{
+		rp.clear();
+		std::vector<std::string> chuncks = http.GetChunks();
+		for(size_t t=0;t<chuncks.size();t++)
+			rp += chuncks[t];
+	}
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
