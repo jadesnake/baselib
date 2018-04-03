@@ -122,6 +122,11 @@ public:
 		virtual void OnHttpTrace(const std::stringstream& ss)=0;
 		virtual void OnOperator(const std::string& method){ }
 	};
+	typedef struct __mm
+	{
+		std::string ts;
+		std::string pubkey;
+	}MM;
 
 	ChangRuan();
 	virtual ~ChangRuan();
@@ -181,8 +186,10 @@ public:
 	}
 protected:
 	bool SecondLogin();
+	bool ThirdLogin(const std::string& ts,const std::string& pubkey);
 	bool SecondConfirmGx(std::string &out);
 	bool ThirdConfirmGx(const std::string& p1,const std::string& p2);
+	MM QueryPubKey(const char *p="checkInvConf");
 
 	CAtlString MakeClientAuthCode(const CAtlString& svrPacket);
 	CAtlString MakeClientHello();
@@ -375,4 +382,26 @@ namespace GxPt
 	//
 	size_t SplitBy(const std::string& src,char delim,std::vector<std::string> &ret);
 	
+	class Encrypt
+	{
+	public:
+		static Encrypt* Get()
+		{
+			static Encrypt encrypt;
+			return &encrypt;
+		}
+		void AddJsCode(HMODULE hInst,LPCTSTR sType,LPCTSTR sName);
+		void AddJsCode(const CAtlString& pathFile);
+		std::string checkTaxno(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e);
+		std::string checkOneInv(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e,const std::string& f,const std::string& g);
+		std::string checkInvConf(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e);
+		std::string checkDeduDown(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e,const std::string& f);
+		std::string BuildCall(const char *fun,const char *p1,...);
+	private:
+		Encrypt(){}
+		virtual ~Encrypt(){}
+	private:
+		typedef std::map<CAtlString,std::string> FileMapCode;
+		FileMapCode jsCode;
+	};
 }

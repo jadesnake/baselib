@@ -2,6 +2,12 @@
 #include "ChangR.h"
 #include "Http/HttpClient.h"
 #include "json/json.h"
+#include <algorithm>
+#include <fstream>
+#include "dir/Dir.h"
+#include <atlfile.h>
+#import "msscript.ocx"
+
 
 typedef HRESULT (__stdcall *DllRegisterApi)(void);
 typedef HRESULT (__stdcall *DllUnregisterApi)(void);
@@ -10,7 +16,7 @@ typedef HRESULT (__stdcall *DllUnregisterApi)(void);
 #define OPT_SUCCESS _T("操作成功")
 #define OPT_DEF_ERROR _T("重复登录或请求异常")
 #define OPT_BAD_DATA _T("数据异常");
-
+#define OPT_NO_USR _T("纳税人档案信息不存在！")
 template<typename T>
 bool ToWhat(std::string str,T &r)
 {  
@@ -191,7 +197,7 @@ ChangRuan::ChangRuan()
 {
 	m_log = NULL;
 	m_hasInitPwd  = false;
-	m_Ymbb = _T("3.0.12");
+	m_Ymbb = _T("3.0.13");
 	m_atuoQuit = true;
 }
 ChangRuan::~ChangRuan()
@@ -220,6 +226,7 @@ bool ChangRuan::Init()
 		m_lastMsg = _T("组件获取失败");
 		return false;
 	}
+	GxPt::Encrypt::Get()->AddJsCode( AppendUrl(GetAppPath(),_T("gxpt.js")) );
 	m_lastMsg = OPT_SUCCESS;
 	return true;
 }
@@ -238,9 +245,11 @@ bool ChangRuan::CheckEnv()
 	if(crypTmp->IsDeviceOpened())
 		crypTmp->CloseDevice();
 	_bstr_t sNull;
+	CComBSTR bstrTmp;
 	long code=0;
 	crypTmp->OpenDeviceEx(sNull);
 	code = crypTmp->ErrCode;
+	bstrTmp = (wchar_t*)crypTmp->ErrMsg;
 	if(code!=0&&code!=-1&&code!=87)
 	{
 		//异常
@@ -376,7 +385,7 @@ bool ChangRuan::Login(AREA area)
 		url = _T("https://fpdk.nb-n-tax.gov.cn");
 		break;
 	case ANHUI:
-		url = _T("https://fpdk.ah-n-tax.gov.cn/");
+		url = _T("https://fpdk.ah-n-tax.gov.cn");
 		break;
 	case FUJIAN:
 		url = _T("https://fpdk.fj-n-tax.gov.cn");
@@ -391,7 +400,9 @@ bool ChangRuan::Login(AREA area)
 		url = _T("https://fpdk.sd-n-tax.gov.cn");
 		break;
 	case QINGDAO:
+		//青岛版本13
 		url = _T("https://fpdk.qd-n-tax.gov.cn");
+		m_Ymbb = _T("3.0.13");
 		break;
 	case HENAN:
 		url = _T("https://fpdk.ha-n-tax.gov.cn");
@@ -498,16 +509,7 @@ bool ChangRuan::Login(AREA area)
 		m_svrPacket = (TCHAR*)CA2CT(root["key2"].asCString());
 		m_svrRandom = (TCHAR*)CA2CT(root["key3"].asCString());
 		m_authCode = MakeClientAuthCode(m_svrPacket);
-		for(int n=0;n<3;n++)
-		{
-			if(SecondLogin())
-			{
-				m_lastMsg = OPT_SUCCESS;
-				return true;
-			}
-			//预防频率过高被拒绝
-			Sleep(100);
-		}
+		return SecondLogin();
 	}
 	m_lastMsg = CodeToError(rezt);
 	if(m_lastMsg.IsEmpty())
@@ -520,20 +522,70 @@ bool ChangRuan::Login(AREA area)
 bool ChangRuan::SecondLogin()
 {
 	CAtlString url(m_ip);
-	url += _T("/SbsqWW/login.do?callback=jQuery");
+	url += _T("/SbsqWW/querymm.do?callback=jQuery");
 	url += GetTickCount();
 
 	std::string rp;
 	curl::CHttpClient http;
 	CosplayIE(&http,m_ip,m_log,"SecondLogin");
+	http.AddParam(_T("cert"),m_tax);
+	http.AddParam("funType","01");
+	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(0x00!=TakeJson(rp))
+	{
+		m_lastMsg = OPT_DEF_ERROR;
+		return false;
+	}
+	Json::Value root;
+	Json::Reader parser;
+	if(!parser.parse(rp,root))
+	{
+		m_lastMsg = OPT_BAD_DATA;
+		return false;
+	}
+	std::string page = root["page"].asCString();
+	std::string ts = root["ts"].asCString();
+	std::string publickey="";
+	if(!page.empty()){
+		CAtlStringA tmp(page.c_str());
+		tmp.Replace("\"","\\\"");
+		page = tmp.GetString();
+		publickey = GxPt::Encrypt::Get()->checkTaxno((char*)CT2CA(m_tax),ts,"",page,(char*)CT2CA(m_svrRandom));
+	}
+	for(int n=0;n<3;n++)
+	{
+		if(ThirdLogin(ts,publickey))
+		{
+			m_lastMsg = OPT_SUCCESS;
+			return true;
+		}
+		if(m_lastMsg==OPT_NO_USR)
+		{
+			return  false;
+		}
+		//预防频率过高被拒绝
+		Sleep(100);
+	}
+	return true;
+}
+bool ChangRuan::ThirdLogin(const std::string& ts,const std::string& pubkey)
+{
+	CAtlString url(m_ip);
+	url += _T("/SbsqWW/login.do?callback=jQuery");
+	url += GetTickCount();
+
+	std::string rp;
+	curl::CHttpClient http;
+	CosplayIE(&http,m_ip,m_log,"ThirdLogin");
 	http.AddParam("type","CLIENT-AUTH");
 	http.AddParam(_T("clientAuthCode"),m_authCode);
-	http.AddParam("password","");
 	http.AddParam(_T("serverRandom"),m_svrRandom);
+	http.AddParam("password","");
+	http.AddParam("ts",ts);
+	http.AddParam("publickey",pubkey);
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam("ymbb",(char*)CT2CA(m_Ymbb));
 	rp	= http.RequestPost((char*)CT2CA(url),false);
-		
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -560,6 +612,11 @@ bool ChangRuan::SecondLogin()
 		m_nsrmc = (TCHAR*)CA2CT(root["key3"].asCString(),CP_UTF8);
 		m_dqrq = (TCHAR*)CA2CT(root["key4"].asCString());
 		return true;
+	}
+	if(rezt=="02")
+	{
+		m_lastMsg = OPT_NO_USR;
+		return false;
 	}
 	m_lastMsg = CodeToError(rezt);
 	if(m_lastMsg.IsEmpty())
@@ -1388,7 +1445,41 @@ bool ChangRuan::QueryRzfp(const Rz& rz,std::string& out)
 	m_lastMsg = CodeToError(key1);
 	return false;
 }
+ChangRuan::MM ChangRuan::QueryPubKey(const char *p)
+{
+	MM ret;
+	CAtlString url(m_ip);
+	url += _T("/SbsqWW/querymm.do?callback=jQuery");
+	url += GetTickCount();
 
+	std::string rp;
+	curl::CHttpClient http;
+	CosplayIE(&http,m_ip,m_log,"QueryPubKey");
+	http.AddParam(_T("cert"),m_tax);
+	http.AddParam("funType","02");
+	rp	= http.RequestPost((char*)CT2CA(url),false);
+	if(0x00!=TakeJson(rp))
+	{
+		return ret;
+	}
+	Json::Value root;
+	Json::Reader parser;
+	if(!parser.parse(rp,root))
+	{
+		return ret;
+	}
+	CAtlStringA page = root["page"].asCString();
+	ret.ts = root["ts"].asCString();
+	if(!page.IsEmpty()){
+		page.Replace("\"","\\\"");
+		if(0==strcmp(p,"checkInvConf"))
+		{
+			//publickey = $.checkInvConf(cert,getCookie("token") , ts ,'',page);
+			ret.pubkey = GxPt::Encrypt::Get()->checkInvConf((char*)CT2CA(m_tax),(char*)CT2CA(m_token),ret.ts,"",page.GetString());
+		}
+	}
+	return ret;
+}
 bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 {
 	if(!crypCtrl)	return false;
@@ -1412,6 +1503,10 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 			zts += _T("0");
 		zts += _T("=");
 	}
+	fpdms.Delete(fpdms.GetLength()-1);
+	fphms.Delete(fphms.GetLength()-1);
+	kprqs.Delete(kprqs.GetLength()-1);
+
 	if(zts.GetLength())
 	{
 		zts.Delete(zts.GetLength()-1);
@@ -1421,6 +1516,8 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 	{
 		return false;
 	}
+	MM mm = QueryPubKey();
+	
 	CAtlString url(m_ip);
 	url += _T("/SbsqWW/gxtj.do?callback=jQuery");
 	url += GetTickCount();
@@ -1435,6 +1532,9 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam(_T("token"),m_token);
 	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("ts",mm.ts);
+	http.AddParam("publickey",mm.pubkey);
+
 	rp	= http.RequestPost((char*)CT2CA(url),false);
 	if(0x00!=TakeJson(rp))
 	{
@@ -2106,5 +2206,155 @@ namespace GxPt
 		}
 		return ret.size();
 	}
+	//
+	std::string Encrypt::BuildCall(const char *fun,const char *p1,...)
+	{
+		std::stringstream ssArgs;
+		ssArgs << fun << '(';
+		if(p1)
+		{
+			va_list Args;
+			va_start(Args, p1);
+			do 
+			{
+				ssArgs << "\"";
+				ssArgs.write(p1,strlen(p1));
+				ssArgs << "\"";
+				ssArgs << ',';
+			} while (p1=va_arg(Args,const char*));
+			va_end(Args);
+		}
+		std::string ret = ssArgs.str();
+		ret.erase(ret.length()-1,1);
+		ret += ");";
+		return ret;
+	}
+	void Encrypt::AddJsCode(HMODULE hInst,LPCTSTR sType,LPCTSTR sName)
+	{
+		HRSRC hRes = ::FindResource(hInst,sName,sType);
+		if (hRes==NULL)		return ;
+		HGLOBAL hGlobal = ::LoadResource(hInst, hRes);
+		if (hGlobal==NULL)	return ;
+		DWORD size = ::SizeofResource(hInst, hRes);
+		if (size == 0)		return ;
+		void *data = ::LockResource(hGlobal);
+		if (data == NULL)	return ;
+		std::string stream;
+		stream.append((char*)data,size);
+		jsCode[sName] = stream;
+		return;
+	}
+	void Encrypt::AddJsCode(const CAtlString& pathFile)
+	{
+		std::stringstream fContent;
+		char tmp[1000] = { 0 };
+		CAtlFile file;
+		HRESULT hr = file.Create(pathFile,GENERIC_READ,FILE_SHARE_READ,OPEN_EXISTING);
+		if(!SUCCEEDED(hr))	return ;
+		while(1)
+		{
+			memset(tmp,0,sizeof(tmp));
+			DWORD dwReadLen = 0;
+			ULONGLONG pos=0,size=0;
+			hr = file.GetPosition(pos);
+			hr = file.GetSize(size);
+			if(pos==size)
+				break;
+			file.Read(tmp,sizeof(tmp),dwReadLen);
+			if(dwReadLen)
+				fContent.write(tmp,dwReadLen);
+		}
+		jsCode[pathFile] = fContent.str();
+	}
+	std::string Encrypt::checkTaxno(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e)
+	{
+		std::string fun;
+		fun = BuildCall("jQueryT.checkTaxno",a.c_str(),b.c_str(),c.c_str(),d.c_str(),e.c_str(),NULL);
 	
+		std::string ret;
+		MSScriptControl::IScriptControlPtr pScriptControl(__uuidof(MSScriptControl::ScriptControl)); 
+		pScriptControl->Language = "JavaScript";
+		pScriptControl->AllowUI = FALSE; 
+		try{
+			for(FileMapCode::iterator it=jsCode.begin();it!=jsCode.end();it++)
+			{
+				pScriptControl->AddCode( it->second.c_str() );
+			}
+			_variant_t outpar = pScriptControl->Eval(fun.c_str()); 
+			ret = CT2CA(outpar.bstrVal);
+			pScriptControl.Release();
+		}
+		catch(_com_error e){
+
+		}
+		return ret;
+	}
+	std::string Encrypt::checkOneInv(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e,const std::string& f,const std::string& g)
+	{
+		std::string fun;
+		fun = BuildCall("jQueryT.checkOneInv",a.c_str(),b.c_str(),c.c_str(),d.c_str(),e.c_str(),f.c_str(),g.c_str(),NULL);
+
+		std::string ret;
+		MSScriptControl::IScriptControlPtr pScriptControl(__uuidof(MSScriptControl::ScriptControl)); 
+		pScriptControl->Language = "JavaScript";
+		pScriptControl->AllowUI = FALSE; 
+		try{
+			for(FileMapCode::iterator it=jsCode.begin();it!=jsCode.end();it++)
+			{
+				pScriptControl->AddCode( it->second.c_str() );
+			}
+			_variant_t outpar = pScriptControl->Eval(fun.c_str()); 
+			ret = CT2CA(outpar.bstrVal);
+			pScriptControl.Release();
+		}
+		catch(_com_error e){
+
+		}
+		return ret;
+	}
+	std::string Encrypt::checkInvConf(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e)
+	{
+		std::string fun;
+		fun = BuildCall("jQueryT.checkInvConf",a.c_str(),b.c_str(),c.c_str(),d.c_str(),e.c_str(),NULL);
+
+		std::string ret;
+		MSScriptControl::IScriptControlPtr pScriptControl(__uuidof(MSScriptControl::ScriptControl)); 
+		pScriptControl->Language = "JavaScript";
+		pScriptControl->AllowUI = FALSE; 
+		try{
+			for(FileMapCode::iterator it=jsCode.begin();it!=jsCode.end();it++)
+			{
+				pScriptControl->AddCode( it->second.c_str() );
+			}
+			_variant_t outpar = pScriptControl->Eval(fun.c_str()); 
+			ret = CT2CA(outpar.bstrVal);
+			pScriptControl.Release();
+		}
+		catch(_com_error e)	{
+
+		}
+		return ret;
+	}
+	std::string Encrypt::checkDeduDown(const std::string& a,const std::string& b,const std::string& c,const std::string& d,const std::string& e,const std::string& f)
+	{
+		std::string fun;
+		fun = BuildCall("jQueryT.checkDeduDown",a.c_str(),b.c_str(),c.c_str(),d.c_str(),e.c_str(),f.c_str(),NULL);
+		MSScriptControl::IScriptControlPtr pScriptControl(__uuidof(MSScriptControl::ScriptControl)); 
+		pScriptControl->Language = "JavaScript";
+		pScriptControl->AllowUI = FALSE; 
+		std::string ret;
+		try{
+			for(FileMapCode::iterator it=jsCode.begin();it!=jsCode.end();it++)
+			{
+				pScriptControl->AddCode( it->second.c_str() );
+			}
+			_variant_t outpar = pScriptControl->Eval(fun.c_str()); 
+			ret = CT2CA(outpar.bstrVal);
+			pScriptControl.Release();
+		}
+		catch(_com_error e){
+
+		}
+		return ret;
+	}
 }
