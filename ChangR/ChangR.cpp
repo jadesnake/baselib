@@ -1511,7 +1511,6 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 	{
 		zts.Delete(zts.GetLength()-1);
 	}
-
 	if(fphms.IsEmpty()||fpdms.IsEmpty()||kprqs.IsEmpty()||zts.IsEmpty())
 	{
 		return false;
@@ -1754,50 +1753,37 @@ void ChangRuan::EnableAutoQuit(bool b)
 }
 namespace GxPt
 {
-	void HandleRzTjByNf(const std::string& key3,RzTjs &out)
+	/*
+	样例数据：
+	{"key1":"01","key2":"0","key3":"201801=61=343784.73=1;201802=34=140601.98=2;201803=129=944751.65=0","key4":"1~0~0~~1~0~0~0~67f28688-8655-4cbe-a297-98acc811374b","key5":"201803;20180418;201804","key6":"20170701-20180331"}
+	*/
+	void HandleRzTjByNf(const std::string& json,RzTjs &out,Ssq &ssq)
 	{
-		size_t all = key3.size();
-		std::string tmp;
-		int nIndex = 0;
-		RzTj rztj;
-		if(all==0)	return ;
+		Json::Reader reader;
+		Json::Value  root;
+		if(!reader.parse(json,root))	return ;
 		out.clear();
-		for(size_t n=0;n<all;n++)
+
+		std::vector<std::string> tmpVals;
+		std::vector<std::string> vals;
+		SplitBy(root["key3"].asCString(),';',tmpVals);
+		for(size_t t=0;t<tmpVals.size();t++)
 		{
-			//最后一个字符
-			if( n==(all-1) )
+			RzTj rztj;
+			vals.clear();
+			if(SplitBy(tmpVals[t],'=',vals))
 			{
-				tmp += key3[n];
-				rztj.zt = CA2CT(tmp.c_str());
+				rztj.tm = CA2CT(vals[0].c_str());
+				rztj.zhangs = CA2CT(vals[1].c_str());
+				rztj.sehj = CA2CT(vals[2].c_str());
+				rztj.zt = CA2CT(vals[3].c_str());
 				out.insert(std::make_pair(rztj.tm,rztj));
-				continue;
 			}
-			if(key3[n]!='='&&key3[n]!=';')
-			{
-				tmp += key3[n];
-				continue;
-			}
-			if(key3[n]=='=')
-			{
-				if(nIndex==0)
-					rztj.tm = CA2CT(tmp.c_str());
-				if(nIndex==1)
-					rztj.zhangs = CA2CT(tmp.c_str());
-				if(nIndex==2)
-					rztj.sehj = CA2CT(tmp.c_str());
-				if(nIndex==3)
-					rztj.zt = CA2CT(tmp.c_str());
-				tmp.clear();
-				nIndex += 1;
-				continue;
-			}
-			if(key3[n]==';')
-			{
-				out.insert(std::make_pair(rztj.tm,rztj));
-				tmp.clear();
-				nIndex = 0;
-				rztj.clear();
-			}
+		}
+		if(SplitBy(root["key5"].asCString(),';',tmpVals))
+		{
+			ssq.curSSq = CA2CT(tmpVals[0].c_str());
+			ssq.curJzRq = CA2CT(tmpVals[1].c_str());
 		}
 		return ;
 	}
@@ -1858,7 +1844,8 @@ namespace GxPt
 	{
 		if(key2.size()==0)	return ;
 		std::vector<std::string> o;
-		SplitBy(key2,'=',o);
+		if(0==SplitBy(key2,'=',o) && key2.size())
+			o.push_back(key2);
 		for(size_t r = 0;r<o.size();r++)
 		{
 			QrHzFp::Qr qr;
@@ -2194,6 +2181,7 @@ namespace GxPt
 		{
 			return 0;
 		}
+		ret.clear();
 		while (index!=std::string::npos)  
 		{
 			ret.push_back(src.substr(last,index-last));  

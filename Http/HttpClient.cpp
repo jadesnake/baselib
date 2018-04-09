@@ -18,7 +18,7 @@ namespace curl {
 			break;
 		case CURLINFO_SSL_DATA_OUT:
 			buf <<std::endl<< "=> Send SSL data";
-			break;
+			return 0;
 		case CURLINFO_HEADER_IN:
 			buf <<std::endl<< "<= Recv header";
 			break;
@@ -27,7 +27,7 @@ namespace curl {
 			break;
 		case CURLINFO_SSL_DATA_IN:
 			buf <<std::endl<< "<= Recv SSL data";
-			break;
+			return 0;
 		}
 		buf.write((char *)data, size);
 		buf.flush();
@@ -375,8 +375,7 @@ namespace curl {
 		{
 			curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
 			curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
-			if(bHttps==false)
-				curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
+			curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
 		}
 #if defined(_DEBUG)
 		curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);

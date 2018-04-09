@@ -238,7 +238,6 @@ void CppSQLite3DBU::close()
 		{
 			GetLastMsg();
 		}
-
 		mpDB = 0;
 	}
 }
@@ -321,7 +320,7 @@ int CppSQLite3DBU::execDML(LPCTSTR szSQL)
 				CSQLiteTool::Get()->Finalize(pVM);
 				pVM=NULL;
 			}			
-			close();
+			//close();
 			nRet=SQLITE_ERROR;
 			break;
 		}
@@ -445,7 +444,7 @@ sqlite3_stmt* CppSQLite3DBU::compile(LPCTSTR szSQL)
 		{
 			CSQLiteTool::Get()->Finalize(pVM);
 		}
-		close();
+		//close();
 		pVM=NULL;
 	}
 

@@ -304,6 +304,12 @@ namespace GxPt
 			sehj.Empty();
 		}
 	};
+	class Ssq
+	{
+	public:
+		CAtlString curSSq;	//当前所属期
+		CAtlString curJzRq;	//所属期截至日期
+	};
 	//确认汇总数据
 	class QrHzFp
 	{
@@ -347,8 +353,8 @@ namespace GxPt
 			}
 			Hz getHzByKey(const TCHAR *key){
 				Hz ret;
-				HashHz::iterator it = countGxTj.find(key);
-				if(it != countGxTj.end())
+				HashHz::iterator it = curGxTj.find(key);
+				if(it != curGxTj.end())
 					ret = it->second;
 				return ret;
 			}
@@ -370,7 +376,7 @@ namespace GxPt
 	};
 	typedef std::map<CAtlString,RzTj,SortDesc> RzTjs;
 	//处理GetRzTjByNf 返回的key3值
-	void HandleRzTjByNf(const std::string& key3,RzTjs &out);
+	void HandleRzTjByNf(const std::string& json,RzTjs &out,Ssq &ssq);
 	//处理QueryQrHzFp 返回的key2值
 	void HandleQrHzFp(const std::string& key2,QrHzFp &out);
 	//处理抵扣统计数据
