@@ -75,6 +75,7 @@ namespace curl
 		//…Ë÷√ ˝æ›¥Ê¥¢
 		void	BodySaveFile(FILE *f);
 		void	SetCookie(const std::string &val);
+		const std::string& GetCookie();
 		//
 		std::string	RequestPost(const CAtlString& url,bool cHeader=true,bool cParam=true,bool perform=true);
 		std::string RequestPost(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
@@ -101,6 +102,7 @@ namespace curl
 		void		SetDebug(CDebug *dbg);
 	protected:
 		std::string encodeParam();
+		void HandleCookie();
 	protected:
 		typedef std::multimap<std::string, std::string>	mapStrings;
 		long		m_tmOut;

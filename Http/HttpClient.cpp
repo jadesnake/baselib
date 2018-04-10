@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "HttpClient.h"
+#include <algorithm>
 namespace curl {
 
 	static int dbg_trace(CURL *handle, curl_infotype type,char *data, size_t size,void *userp)
@@ -18,7 +19,7 @@ namespace curl {
 			break;
 		case CURLINFO_SSL_DATA_OUT:
 			buf <<std::endl<< "=> Send SSL data";
-			return 0;
+			break;
 		case CURLINFO_HEADER_IN:
 			buf <<std::endl<< "<= Recv header";
 			break;
@@ -27,7 +28,7 @@ namespace curl {
 			break;
 		case CURLINFO_SSL_DATA_IN:
 			buf <<std::endl<< "<= Recv SSL data";
-			return 0;
+			break;
 		}
 		buf.write((char *)data, size);
 		buf.flush();
@@ -375,7 +376,8 @@ namespace curl {
 		{
 			curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
 			curl_easy_setopt(m_url, CURLOPT_DEBUGFUNCTION, dbg_trace);
-			curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
+			if(bHttps==false)
+				curl_easy_setopt(m_url, CURLOPT_DEBUGDATA, (void*)m_dbg);
 		}
 #if defined(_DEBUG)
 		curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
@@ -607,6 +609,7 @@ namespace curl {
 		}
 		if(200!=ReqeustCode())
 			return strRet;	//非200返回空
+		HandleCookie();
 		if( m_wbuf.tellp() < 0 ) 
 			return strRet;
 		return m_wbuf.str();
@@ -640,6 +643,46 @@ namespace curl {
 	}
 	void	CHttpClient::SetCookie(const std::string &val) {
 		m_cookie = val;
+	}
+	const std::string& CHttpClient::GetCookie(){
+		return m_cookie;
+	}
+	void CHttpClient::HandleCookie()
+	{
+		std::string setCookie("set-cookie");
+		std::string cookie("cookie");
+		std::string line;
+		std::string tmp;
+		m_headbuf.seekp(0);
+		m_headbuf.seekg(0);
+		while(std::getline(m_headbuf,line))
+		{
+			std::string t1 = line.substr(0,setCookie.length());
+			std::string t2 = line.substr(0,cookie.length());
+			if(t1.size())
+				std::transform(t1.begin(), t1.end(), t1.begin(), ::tolower);
+			if(t2.size())
+				std::transform(t2.begin(), t2.end(), t2.begin(), ::tolower); 
+			size_t startPos=0,endPos = 0;
+			if(t1==setCookie){
+				//跳过:号
+				startPos = t1.length()+1;
+				endPos = line.find(';');
+			}
+			else if(t2==cookie){
+				startPos = t2.length()+1;
+				endPos = line.find(';');
+			}
+			if(startPos && endPos){
+				if(endPos!=-1)
+					tmp = line.substr(startPos,endPos-startPos);
+				else
+					tmp = line.substr(startPos);
+				m_cookie = tmp;
+				break;
+			}
+			//transform(str.begin(), str.end(), str.begin(), ::toupper); //将小写的都转换成大写
+		}		
 	}
 	std::string CHttpClient::encodeParam() 
 	{
