@@ -29,6 +29,7 @@ namespace CustomUI
 		ListHeaderItemUI();
 		void SetOwner(DuiLib::CListUI *listUI);
 		bool Add(DuiLib::CControlUI* pControl);
+		SIZE EstimateSize(SIZE szAvailable);
 		DUI_DECLARE(CustomUI::ListHeaderItemUI,DuiLib::CListHeaderItemUI)
 	protected:
 		void DoEvent(DuiLib::TEventUI& event);
@@ -37,6 +38,9 @@ namespace CustomUI
 		void SetChildrenOwner();
 	private:
 		DuiLib::CListUI *mList;
+		SIZE mAvailableSize;
+		SIZE mEstSize;	//计算后的宽高值
+		float  mRatX;
 	};
 	//
 	class CListHeaderUI : public DuiLib::CListHeaderUI
@@ -44,8 +48,19 @@ namespace CustomUI
 	public:
 		CListHeaderUI();
 		bool Add(DuiLib::CControlUI* pControl);
+		SIZE EstimateSize(SIZE szAvailable);
+		DuiLib::CListUI* GetListUI();
 		DUI_DECLARE(CustomUI::CListHeaderUI,DuiLib::CListHeaderUI)
 	protected:
+		typedef struct {
+			DuiLib::CControlUI* ui;
+			SIZE sz;
+		}NEED_SIZE;
 		void Init();
+		long SubCtrSizeForRaw();
+		void GetValidCtrForRaw(std::vector<NEED_SIZE> &out,SIZE szBlank);
+	private:
+		//记录每个控件原始大小
+		std::map<DuiLib::CControlUI*,SIZE> mCtrRawSize;
 	};
 }

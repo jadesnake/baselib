@@ -44,15 +44,19 @@ namespace CustomUI
 		{
 			return new TemplateClick<DuiLib::CLabelUI>();
 		}
-		if(_tcscmp(pstrClass,_T("CustomUI::ListHeaderItemUI"))==0)
+		if(_tcscmp(pstrClass,_T("CustomUI::ListHeaderItemUI"))==0 || 
+		   _tcscmp(pstrClass,_T("CustomUI::ListHeaderItem"))==0 )
 		{
 			return new CustomUI::ListHeaderItemUI;
 		}
-		if(_tcscmp(pstrClass,_T("CustomUI::CListHeaderUI"))==0)
+		if(_tcscmp(pstrClass,_T("CustomUI::CListHeaderUI"))==0 || 
+		   _tcscmp(pstrClass,_T("CustomUI::ListHeader"))==0 )
 		{
 			return new CustomUI::CListHeaderUI;
 		}
-		return base->CreateControl(pstrClass);
+		if(base)
+			return base->CreateControl(pstrClass);
+		return NULL;
 	}
 	//ÊôÐÔ½Ó¿Ú
 	template<class DuiWinBase>
@@ -73,7 +77,12 @@ namespace CustomUI
 		}
 		DuiLib::CControlUI* CreateControl(LPCTSTR pstrClass)
 		{
-			return CreateCustomUI(pstrClass,static_cast<DuiWinBase*>(this));
+			DuiLib::CControlUI *ret = CreateCustomUI<DuiWinBase>(pstrClass,NULL);
+			if(ret==NULL)
+			{
+				ret = DuiWinBase::CreateControl(pstrClass);
+			}
+			return ret;
 		}
 	};
 }

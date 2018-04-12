@@ -172,6 +172,8 @@ namespace CustomUI
 	ListHeaderItemUI::ListHeaderItemUI()
 	{
 		mList = NULL;
+		memset(&mEstSize,0,sizeof(SIZE));
+		memset(&mAvailableSize,0,sizeof(SIZE));
 	}
 	void ListHeaderItemUI::LoopSetOwner(DuiLib::CControlUI* pControl)
 	{
@@ -222,6 +224,51 @@ namespace CustomUI
 	{
 		__super::Init();
 		SetChildrenOwner();
+	}
+	SIZE ListHeaderItemUI::EstimateSize(SIZE szAvailable)
+	{
+		/*
+		SIZE adjSize = m_cxyFixed;
+		if(adjSize.cy==0)
+			adjSize.cy =  m_pManager->GetDefaultFontInfo()->tm.tmHeight + 14;
+		if(mAvailableSize.cx==0 && m_cxyMin.cx && adjSize.cx==0)
+		{
+			mAvailableSize = szAvailable;
+			if(adjSize.cx<m_cxyMin.cx)
+				adjSize.cx = m_cxyMin.cx;
+			mEstSize = adjSize;
+			//产生固定比
+			mRatX = (float)mAvailableSize.cx/(float)m_cxyMin.cx;
+			return mEstSize;
+		}
+		if(mAvailableSize.cx==szAvailable.cx && mEstSize.cx && adjSize.cx==0)
+		{
+			return mEstSize;
+		}
+		if(mAvailableSize.cx!=szAvailable.cx && m_cxyMin.cx && adjSize.cx==0 )
+		{
+			if(mRatX<0.00001)
+				adjSize.cx = m_cxyMin.cx;
+			else
+			{
+				long ratW = (szAvailable.cx - mAvailableSize.cx)/mRatX;
+				if(mEstSize.cx)
+					mEstSize.cx += ratW;
+				else
+					mEstSize.cx = m_cxyMin.cx + ratW;
+				if(mEstSize.cx<m_cxyMin.cx)
+					mEstSize.cx = m_cxyMin.cx;
+				adjSize = mEstSize;
+			}
+			mAvailableSize = szAvailable;
+			mEstSize = adjSize;
+			return mEstSize;
+		}*/
+		if( m_cxyFixed.cy == 0 ) 
+		{
+			return DuiLib::CSize(m_cxyFixed.cx, m_pManager->GetDefaultFontInfo()->tm.tmHeight + 14);
+		}
+		return CContainerUI::EstimateSize(szAvailable);
 	}
 	void ListHeaderItemUI::DoEvent(DuiLib::TEventUI& event)
 	{
@@ -299,8 +346,139 @@ namespace CustomUI
 			CustomUI::ListHeaderItemUI *headItem = base::SafeConvert<CustomUI::ListHeaderItemUI>(GetItemAt(n),_T("CustomUI::ListHeaderItemUI"));
 			if(headItem)
 			{
-				headItem->SetOwner(base::SafeConvert<DuiLib::CListUI>(GetParent(),DUI_CTR_LIST));
+				headItem->SetOwner( GetListUI() );
 			}
 		}
+	}
+	DuiLib::CListUI* CListHeaderUI::GetListUI()
+	{
+		return base::SafeConvert<DuiLib::CListUI>(GetParent(),DUI_CTR_LIST);
+	}
+	long CListHeaderUI::SubCtrSizeForRaw()
+	{
+		long ret = 0;
+		std::map<DuiLib::CControlUI*,SIZE>::iterator it = mCtrRawSize.begin();
+		std::vector<DuiLib::CControlUI*> remove;
+		for(it;it!=mCtrRawSize.end();it++)
+		{
+			if(!it->first->IsFloat() && it->first->IsVisible())
+				ret += it->second.cx;
+		}
+		return ret;
+	}
+	void CListHeaderUI::GetValidCtrForRaw(std::vector<NEED_SIZE> &out,SIZE szBlank)
+	{
+		std::map<DuiLib::CControlUI*,SIZE>::iterator it = mCtrRawSize.begin();
+		std::vector<DuiLib::CControlUI*> remove;
+		for(it;it!=mCtrRawSize.end();it++)
+		{
+			DuiLib::CControlUI *ui = it->first;
+			if(!ui->IsFloat() && ui->IsVisible())
+			{
+				NEED_SIZE one;
+				SIZE szNeed = ui->EstimateSize(szBlank);
+				if(szNeed.cx < ui->GetMaxWidth() || ui->GetMaxWidth()==0)
+				{
+					one.sz = szNeed;
+					one.ui = ui;
+					out.push_back(one);
+				}
+			}
+		}
+	}
+	SIZE CListHeaderUI::EstimateSize(SIZE szAvailable)
+	{
+		SIZE  sz = __super::EstimateSize(szAvailable);
+		//记录每个控件需要的size
+		if(mCtrRawSize.size()==0)
+		{
+			//存储原始宽度
+			int nBlankX = szAvailable.cx-sz.cx;
+			for(int n=0;n<GetCount();n++)
+			{
+				DuiLib::CControlUI *ctr = GetItemAt(n);
+				SIZE szNeed = ctr->EstimateSize(szAvailable);
+				//if( nBlankX && n==(GetCount()-1))
+				//	szNeed.cx += nBlankX;
+				mCtrRawSize.insert( std::make_pair(ctr,szNeed) );
+			}
+			return sz;
+		}
+
+		long remainX = szAvailable.cx - sz.cx;
+		if(remainX==0)	return sz;
+		long rawX = SubCtrSizeForRaw();
+		if(rawX==0) return sz;
+		DuiLib::CListUI* listUI = GetListUI();
+		if(listUI->GetVerticalScrollBar() && listUI->GetVerticalScrollBar()->IsVisible() && remainX<0)
+		{
+			if(abs(remainX) == listUI->GetVerticalScrollBar()->GetFixedWidth())
+				return sz;
+		}
+		std::vector<NEED_SIZE> adjCtr;
+		GetValidCtrForRaw(adjCtr,szAvailable);
+		if(adjCtr.size()==0)	return sz;
+
+		sz.cx = szAvailable.cx;
+		if(rawX==szAvailable.cx)
+		{
+			for(int n=0;n<adjCtr.size();n++)
+			{
+				NEED_SIZE *one = &adjCtr.at(n);
+				SIZE szRaw = mCtrRawSize[one->ui];
+				one->ui->SetFixedWidth(szRaw.cx);
+			}
+			return sz;
+		}
+		int nPerX = remainX/(int)adjCtr.size();
+		if(nPerX==0 && adjCtr.size() )
+		{
+			nPerX = remainX%(int)adjCtr.size();
+			NEED_SIZE *one = &adjCtr.at( adjCtr.size()-1 );
+			SIZE szRaw = mCtrRawSize[one->ui];
+			int nX = one->sz.cx+nPerX;
+			if(nX < szRaw.cx)
+				nX = szRaw.cx;
+			one->ui->SetFixedWidth(nX);
+			return sz;
+		}
+		else if(remainX>0)
+		{
+			for(int n=0;n<adjCtr.size() && remainX>0 && nPerX;n++)
+			{
+				NEED_SIZE *one = &adjCtr.at(n);
+				if(remainX-nPerX)
+				{
+					one->sz.cx += nPerX;
+				}
+				else
+				{
+					one->sz.cx += remainX;
+				}
+				remainX -= nPerX;
+				one->ui->SetFixedWidth(one->sz.cx);
+			}
+		}
+		else
+		{
+			for(int n=0;n<adjCtr.size() && remainX<0 && nPerX;n++)
+			{
+				NEED_SIZE *one = &adjCtr.at(n);
+				SIZE szRaw = mCtrRawSize[one->ui];
+				if(remainX-nPerX)
+				{
+					one->sz.cx += nPerX;
+				}
+				else
+				{
+					one->sz.cx += remainX;
+				}
+				remainX -= nPerX;
+				if(one->sz.cx < szRaw.cx)
+					one->sz.cx = szRaw.cx;
+				one->ui->SetFixedWidth(one->sz.cx);
+			}
+		}
+		return sz;
 	}
 }
