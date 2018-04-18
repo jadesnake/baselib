@@ -106,6 +106,7 @@ CppSQLite3DBU::CppSQLite3DBU()
 	mpDB = 0;
 	mnBusyTimeoutMs = 60000; // 60 seconds
 	mpVM = NULL;
+	autoShutDown = true;
 }
 
 CppSQLite3DBU::CppSQLite3DBU(const CppSQLite3DBU& db)
@@ -113,13 +114,17 @@ CppSQLite3DBU::CppSQLite3DBU(const CppSQLite3DBU& db)
 	mpDB = db.mpDB;
 	mnBusyTimeoutMs = 60000; // 60 seconds
 	mpVM=NULL;
+	autoShutDown = false;
 }
-
-
+void CppSQLite3DBU::setAutoShutDown(bool autoShutDown)
+{
+	this->autoShutDown = autoShutDown;
+}
 CppSQLite3DBU::~CppSQLite3DBU()
 {
 	close();
-	CSQLiteTool::Get()->Shutdown();
+	if(autoShutDown)
+		CSQLiteTool::Get()->Shutdown();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -330,6 +335,8 @@ int CppSQLite3DBU::execDML(LPCTSTR szSQL)
 		//Sleep(1);
 	} 
 	while( nRet == SQLITE_SCHEMA );
+	if(nRet != SQLITE_OK)
+		GetLastMsg();
 	return nRet;
 }
 

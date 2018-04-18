@@ -53,9 +53,8 @@ public:
 
 // Operations
 public:
-
     virtual ~CppSQLite3DBU();
-
+	void setAutoShutDown(bool autoShutDown);
     bool open(LPCTSTR szFile);
 	bool openEx(LPCTSTR pszMemory);
 
@@ -102,6 +101,7 @@ public:
     int mnBusyTimeoutMs;
 	sqlite3_stmt* mpVM;
 	CAtlString lastMsg;
+	bool autoShutDown;
 };
 /////////////////////////////////////////////////////////////////////////////
 
