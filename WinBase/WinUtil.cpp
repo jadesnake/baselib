@@ -45,15 +45,23 @@ bool IsModuleHandleValid(HMODULE module_handle)
 		return true;
 	return module_handle == GetModuleHandleFromAddress(module_handle);
 }
+bool RunConsoleApp(const wchar_t *application, HANDLE *process)
+{
+	return RunAppWithRedirection(application, NULL, NULL, NULL, NULL,true,process);
+}
+bool RunConsoleAppWithCmd(const wchar_t *application, const wchar_t *command, HANDLE *process)
+{
+	return RunAppWithRedirection(application, command, NULL, NULL, NULL,true,process);
+}
 
 bool RunApp(const wchar_t *application, HANDLE *process)
 {
-	return RunAppWithRedirection(application, NULL, NULL, NULL, NULL, process);
+	return RunAppWithRedirection(application, NULL, NULL, NULL, NULL,false,process);
 }
 
 bool RunAppWithCommand(const wchar_t *application, const wchar_t *command, HANDLE *process)
 {
-	return RunAppWithRedirection(application, command, NULL, NULL, NULL, process);
+	return RunAppWithRedirection(application, command, NULL, NULL, NULL,false,process);
 }
 
 bool RunAppWithRedirection(const wchar_t *application,
@@ -61,6 +69,7 @@ bool RunAppWithRedirection(const wchar_t *application,
 						   HANDLE input,
 						   HANDLE output,
 						   HANDLE error,
+						   bool bConsole,
 						   HANDLE *process)
 {
 	PROCESS_INFORMATION pi;
@@ -75,15 +84,19 @@ bool RunAppWithRedirection(const wchar_t *application,
 	si.hStdInput	= input ? input : ::GetStdHandle(STD_INPUT_HANDLE);
 	si.hStdOutput	= output ? output : ::GetStdHandle(STD_OUTPUT_HANDLE);
 	si.hStdError	= error ? error : ::GetStdHandle(STD_ERROR_HANDLE);
+	DWORD createFlags = 0;
+	if(bConsole)
+		createFlags |= CREATE_NO_WINDOW;
 
 	wchar_t *command_dup = wcsdup(command);
-
-	if (::CreateProcessW(application,
+	HANDLE hToken = NULL;
+	::OpenProcessToken(GetCurrentProcess(),TOKEN_ALL_ACCESS,&hToken);
+	if (::CreateProcessAsUserW(hToken,application,
 						 command_dup,
 						 NULL,
 						 NULL,
 						 (si.dwFlags & STARTF_USESTDHANDLES) ? TRUE : FALSE,
-						 CREATE_NO_WINDOW|CREATE_SUSPENDED,
+						 createFlags,
 						 NULL,
 						 NULL,
 						 &si,
@@ -94,10 +107,11 @@ bool RunAppWithRedirection(const wchar_t *application,
 			::CloseHandle(pi.hProcess);
 		else
 			*process = pi.hProcess;
+		::CloseHandle(hToken);
 		free(command_dup);
 		return true;
 	}
-
+	::CloseHandle(hToken);
 	free(command_dup);
 	return false;
 }

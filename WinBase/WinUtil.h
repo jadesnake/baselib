@@ -20,7 +20,11 @@ namespace base
 									HANDLE input,
 									HANDLE output,
 									HANDLE error,
+									bool bConsole,
 									HANDLE *process = NULL);
+ bool RunConsoleApp(const wchar_t *application, HANDLE *process = NULL);
+ bool RunConsoleAppWithCmd(const wchar_t *application, const wchar_t *command, HANDLE *process = NULL);
+
 
  bool MinimizeProcessWorkingSize();
  bool SingletonRun(const wchar_t *application);

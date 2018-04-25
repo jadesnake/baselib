@@ -36,6 +36,15 @@ namespace base
 		view_ = reinterpret_cast<unsigned char*>(::MapViewOfFile(shared_memory->mapping_, access, 0, 0, 0));
 		return view_ != NULL;
 	}
+	int  SharedMemory::MappedView::GetSize()
+	{
+		if(view_==NULL)
+			return 0;
+		MEMORY_BASIC_INFORMATION memoryInfo;
+		if(!::VirtualQuery(view_,&memoryInfo,sizeof(MEMORY_BASIC_INFORMATION)))
+			return 0;
+		return memoryInfo.RegionSize;
+	}
 	void SharedMemory::MappedView::CloseView()
 	{
 		if (view_)

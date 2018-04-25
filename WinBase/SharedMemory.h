@@ -17,6 +17,7 @@ namespace base
 		bool Create(const wchar_t *name, int size);
 		bool Open(const wchar_t *name);
 		void Close();
+		int  GetSize();
 
 		class MappedView
 		{
@@ -24,9 +25,9 @@ namespace base
 			MappedView() : view_(NULL) {}
 			~MappedView() { CloseView(); }
 			bool OpenView(SharedMemory *shared_memory, bool read_write);
+			int  GetSize();
 			void CloseView();
 			unsigned char *view() { return view_; }
-
 		private:
 			unsigned char *view_;
 		};
@@ -42,7 +43,6 @@ namespace base
 				return reinterpret_cast<T*>(view());
 			}
 		};
-
 	private:
 		friend class MappedView;
 		HANDLE mapping_;
