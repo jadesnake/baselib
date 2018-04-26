@@ -136,4 +136,22 @@ namespace ChinaAmount
 		out = tmp1 + tmp2;
 		return true;
 	}
+	UINT Unit2Number(const CAtlString& unit)
+	{
+		UINT ret = 1;
+		if(unit==_T("百"))
+			ret = 100;
+		else if(unit==_T("千"))
+			ret = 1000;
+		else if(unit==_T("万"))
+			ret = 10000;
+		else if(unit==_T("十万"))
+			ret = 100000;
+		else if(unit==_T("百万"))
+			ret = 1000000;
+		else if(unit==_T("千万"))
+			ret = 10000000;
+		return ret;
+	}
+
 }
