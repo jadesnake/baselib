@@ -431,14 +431,20 @@ namespace curl {
 		CURLcode code;
 		if (m_url)
 		{
+			std::stringstream dbgSS;
+
 			PerformParam(url);
 			curl_easy_setopt(m_url, CURLOPT_POST, 1L);
 			curl_easy_setopt(m_url, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
+			if(bHttps && m_dbg)
+				dbgSS<<"url "<< url <<std::endl;
 			if (!m_params.empty())
 			{
 				std::string encode = encodeParam();
 				curl_easy_setopt(m_url, CURLOPT_POSTFIELDSIZE, encode.length());
 				curl_easy_setopt(m_url, CURLOPT_COPYPOSTFIELDS,encode.c_str());
+				if(bHttps && m_dbg)
+					dbgSS<<"param "<< encode <<std::endl;
 			}
 			else if (m_rbuf.tellp())
 			{
@@ -452,6 +458,8 @@ namespace curl {
 				m_params.clear();
 			if(cHeader)
 				m_header.clear();
+			if(bHttps && m_dbg)
+				m_dbg->OnCurlDbgTrace(dbgSS);
 			if(perform)
 				code = curl_easy_perform(m_url);
 		}
