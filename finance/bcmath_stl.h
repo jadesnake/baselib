@@ -50,19 +50,19 @@ public:
     BCMath(float num) : value() { 
 		std::stringstream ss;
 		ss.precision(30);
-		ss << num; 
+		ss <<std::fixed<<num; //std::fixed可将科学计数法转成正常
 		value = ss.str();
 	}
     BCMath(double num) : value() { 
 		std::stringstream ss; 
 		ss.precision(30);
-		ss << num; 
+		ss <<std::fixed<<num; //std::fixed可将科学计数法转成正常	
 		value = ss.str();
 	}
     BCMath(long double num) {
 		std::stringstream ss; 
 		ss.precision(35);
-		ss << num; 
+		ss <<std::fixed<<num; //std::fixed可将科学计数法转成正常
 		value = ss.str();
 	}
 
