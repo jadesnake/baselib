@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <assert.h>
 #include "FileDialog.h"
 namespace CustomUI
 {
@@ -152,7 +153,7 @@ namespace CustomUI
 			if (lpszTmp != NULL &&
 				(lpszTmp - (LPCTSTR)strPath) == strPath.GetLength()-1)
 			{
-				ASSERT(*lpszTmp == '\\' || *lpszTmp == '/');
+				//ASSERT(*lpszTmp == '\\' || *lpszTmp == '/');
 				return strPath + strFileName;
 			}
 		}

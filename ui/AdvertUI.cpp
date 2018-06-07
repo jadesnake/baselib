@@ -1,4 +1,5 @@
 #include "StdAfx.h"
+#include "UIlib.h"
 #include "AdvertUI.h"
 #include "../MacroX.h"
 #define TM_ADVERT	4672

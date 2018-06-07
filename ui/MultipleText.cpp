@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include "UIlib.h"
 #include "MultipleText.h"
 
 namespace CustomUI

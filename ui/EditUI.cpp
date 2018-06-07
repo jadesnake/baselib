@@ -1,4 +1,5 @@
 #include "StdAfx.h"
+#include "UIlib.h"
 #include "EditUI.h"
 
 namespace CustomUI
