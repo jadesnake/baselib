@@ -324,6 +324,7 @@ namespace curl {
 		
 		curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 100);	//³¬Ê±µ¥Î»Ãë
 		curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
+		 
 		curl_easy_setopt(m_url, CURLOPT_AUTOREFERER, 1L);
 		if (!m_cookie.empty()) {
 			curl_easy_setopt(m_url, CURLOPT_COOKIE,m_cookie.c_str());
@@ -699,13 +700,14 @@ namespace curl {
 		for (itPos; itPos != m_params.end(); itPos++)
 		{
 			std::string strVal;
-			if (!itPos->first.empty() && !itPos->second.empty()) {
+			if (!itPos->first.empty()) {
 				char *key = NULL;
 				char *val = NULL;
 				if(m_bEncodeUrl)
 				{
 					key = curl_easy_escape(m_url,itPos->first.c_str(), itPos->first.length());
-					val = curl_easy_escape(m_url,itPos->second.c_str(),itPos->second.length());
+					if(!itPos->second.empty())
+						val = curl_easy_escape(m_url,itPos->second.c_str(),itPos->second.length());
 				}
 				if (key) {
 					ret.append(key);
