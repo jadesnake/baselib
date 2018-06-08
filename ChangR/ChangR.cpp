@@ -8,11 +8,6 @@
 #include <atlfile.h>
 #import "msscript.ocx"
 
-
-typedef HRESULT (__stdcall *DllRegisterApi)(void);
-typedef HRESULT (__stdcall *DllUnregisterApi)(void);
-
-
 #define OPT_SUCCESS _T("操作成功")
 #define OPT_DEF_ERROR _T("重复登录或请求异常")
 #define OPT_BAD_DATA _T("数据异常");
@@ -71,7 +66,7 @@ std::string BuildPagerJson(ChangRuan::Pager *p,int columns)
 			break;
 		case 4:
 			tmp["name"]="iDisplayLength";
-			tmp["value"] = (char*)CT2CA(p->nMax);
+			tmp["value"] = _ttol(p->nMax);
 			break;
 		}
 		jsonRq.append(tmp);
@@ -85,7 +80,10 @@ std::string BuildPagerJson(ChangRuan::Pager *p,int columns)
 		tmp["value"]=n;
 		jsonRq.append(tmp);
 	}
-	return jsonRq.toStyledString();
+	Json::FastWriter writer;  
+	std::string jsonStream = writer.write(jsonRq); 
+	jsonStream.erase(jsonStream.begin()+(jsonStream.length()-1));
+	return jsonStream;
 }
 
 
@@ -186,6 +184,10 @@ CAtlString CodeToError(const std::string& code)
 	{
 		ret = _T("信息出现异常，请稍后再试！");
 	}
+	else if( code=="300" )
+	{
+		ret = _T("服务器繁忙");
+	}
 	else
 	{
 		ret = _T("未知异常");
@@ -197,7 +199,7 @@ ChangRuan::ChangRuan()
 {
 	m_log = NULL;
 	m_hasInitPwd  = false;
-	m_Ymbb = _T("3.0.13");
+	m_Ymbb = "3.1.01";
 	m_atuoQuit = true;
 }
 ChangRuan::~ChangRuan()
@@ -238,7 +240,7 @@ bool ChangRuan::CheckEnv()
 	if(!SUCCEEDED(hr))
 	{
 		if(SUCCEEDED(hr))
-			hr = crypCtrl.CoCreateInstance(__uuidof(CryptCtl));
+			hr = crypTmp.CoCreateInstance(__uuidof(CryptCtl));
 		m_lastMsg = _T("组件获取失败");
 		return false;
 	}
@@ -259,6 +261,8 @@ bool ChangRuan::CheckEnv()
 		crypTmp.Release();
 		return false;
 	}
+	crypTmp->CloseDevice();
+	crypTmp.Release();
 	m_lastMsg = OPT_SUCCESS;
 	return true;
 }
@@ -400,9 +404,7 @@ bool ChangRuan::Login(AREA area)
 		url = _T("https://fpdk.sd-n-tax.gov.cn");
 		break;
 	case QINGDAO:
-		//青岛版本13
 		url = _T("https://fpdk.qd-n-tax.gov.cn");
-		m_Ymbb = _T("3.0.13");
 		break;
 	case HENAN:
 		url = _T("https://fpdk.ha-n-tax.gov.cn");
@@ -447,7 +449,7 @@ bool ChangRuan::Login(AREA area)
 		url = _T("https://fpdk.gs-n-tax.gov.cn");
 		break;
 	case QINGHAI:
-		url = _T("https://fpdk.qh-n-tax.gov.cn");
+		url = _T("http://fpdk.qh-n-tax.gov.cn");
 		break;
 	case NINGXIA:
 		url = _T("https://fpdk.nxgs.gov.cn");
@@ -471,9 +473,9 @@ bool ChangRuan::Login(AREA area)
 	CosplayIE(&http,m_ip,m_log,"Login",3);
 	http.AddParam("type","CLIENT-HELLO");
 	http.AddParam(_T("clientHello"),MakeClientHello());
-	http.AddParam("ymbb",(char*)CT2CA(m_Ymbb));
+	http.AddParam("ymbb",m_Ymbb);
 	rp	= http.RequestPost((char*)CT2CA(url),false);
-		
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -501,7 +503,7 @@ bool ChangRuan::Login(AREA area)
 		if(!root["key3"].isNull())
 			m_nsrmc = (TCHAR*)CA2CT(http.DecodeUrl(root["key3"].asCString()).c_str(),CP_UTF8);
 		if(!root["key4"].isNull())
-			m_dqrq = (TCHAR*)CA2CT(root["key4"].asCString());
+			m_dqrq = root["key4"].asCString();
 		return true;
 	}
 	if(rezt=="01")
@@ -509,7 +511,9 @@ bool ChangRuan::Login(AREA area)
 		m_svrPacket = (TCHAR*)CA2CT(root["key2"].asCString());
 		m_svrRandom = (TCHAR*)CA2CT(root["key3"].asCString());
 		m_authCode = MakeClientAuthCode(m_svrPacket);
-		return SecondLogin();
+		if(SecondLogin()&&QueryHqssq())
+			return true;
+		return false;
 	}
 	m_lastMsg = CodeToError(rezt);
 	if(m_lastMsg.IsEmpty())
@@ -531,6 +535,7 @@ bool ChangRuan::SecondLogin()
 	http.AddParam(_T("cert"),m_tax);
 	http.AddParam("funType","01");
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -584,8 +589,9 @@ bool ChangRuan::ThirdLogin(const std::string& ts,const std::string& pubkey)
 	http.AddParam("ts",ts);
 	http.AddParam("publickey",pubkey);
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam("ymbb",(char*)CT2CA(m_Ymbb));
+	http.AddParam("ymbb",m_Ymbb);
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -608,9 +614,9 @@ bool ChangRuan::ThirdLogin(const std::string& ts,const std::string& pubkey)
 	if(rezt=="03")
 	{
 		m_lastMsg = OPT_SUCCESS;
-		m_token = (TCHAR*)CA2CT(root["key2"].asCString());
+		m_token = root["key2"].asCString();
 		m_nsrmc = (TCHAR*)CA2CT(root["key3"].asCString(),CP_UTF8);
-		m_dqrq = (TCHAR*)CA2CT(root["key4"].asCString());
+		m_dqrq = root["key4"].asCString();
 		return true;
 	}
 	if(rezt=="02")
@@ -636,8 +642,8 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 	curl::CHttpClient http;
 	CosplayIE(&http,m_ip,m_log,"GetDkTjByDate",3000);
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("token",m_token);
+	http.AddParam("ymbb",m_Ymbb);
 	http.AddParam("oper","tj");
 	if(!date.IsEmpty())
 	{
@@ -645,7 +651,9 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 		tmp.Remove('-');
 		http.AddParam(_T("tjyf"),tmp);
 	}
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -671,7 +679,7 @@ bool ChangRuan::GetDkTjByDate(const CAtlString& date,std::string &out)
 	}
 	if(retCode=="20")
 	{
-		m_token = (TCHAR*)CA2CT(root["key3"].asCString());
+		m_token = root["key3"].asCString();
 		out = root["key2"].asString();
 		m_lastMsg = OPT_SUCCESS;
 		return true;
@@ -696,11 +704,15 @@ bool ChangRuan::GetRzTjByNf(const CAtlString& nf,std::string &out)
 	curl::CHttpClient http;
 	CosplayIE(&http,m_ip,m_log,"GetRzTjByNf",3000);
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
-	if(!nf.IsEmpty())
-		http.AddParam(_T("rznf"),nf);
+	http.AddParam("token",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.AddParam(_T("rznf"),nf);
+	http.SetCookie(MakeCookie());
+	//海南发起空mm
+	BlankMM();
+	//
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(http.IsResponseChunk())
 	{
 		rp.clear();
@@ -730,32 +742,16 @@ bool ChangRuan::GetRzTjByNf(const CAtlString& nf,std::string &out)
 	CAtlString strCZSD;	//当期可勾选、确认截止日期
 
 	std::string retCode(root["key1"].asCString());
-	if(retCode=="01")
+	if(retCode=="01" && !root["key4"].asString().empty())
 	{
 		m_lastMsg = OPT_SUCCESS;
 		CAtlString key5;
-		m_token = (TCHAR*)CA2CT(root["key4"].asCString());
-		key5 = (TCHAR*)CA2CT(root["key5"].asCString());
-		int nWhere=0;
-		for(int n=0;n<key5.GetLength();n++)
-		{
-			if(key5[n]!=';')
-				buffer += key5[n];
-			else
-			{
-				nWhere += 1;
-				if(nWhere==1)
-					strSSQ=buffer;
-				else if(nWhere==2)
-					strCZSD=buffer;
-				buffer.Empty();
-			}
-		}
-		m_skssq = key5;
-		m_skssq.Replace(_T(";"),_T("%3B"));
+		m_token = root["key4"].asCString();
+		m_skssq = root["key5"].asCString();
 		out = rp;
 		return true;
 	}
+	m_lastMsg = OPT_DEF_ERROR;
 	m_lastMsg = CodeToError(retCode);
 	return false;
 }
@@ -772,10 +768,12 @@ bool ChangRuan::GetQrGxBySsq(const CAtlString& ssq,std::string &out)
 	CosplayIE(&http,m_ip,m_log,"GetQrGxBySsq");
 	http.AddParam("id","querysbzt");
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("key2",m_token);
+	http.AddParam("ymbb",m_Ymbb);
 	http.AddParam(_T("ssq"),ssq);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(m_ip),false);
+	m_cookie = http.GetCookie();
 	if(http.IsResponseChunk())
 	{
 		rp.clear();
@@ -804,7 +802,7 @@ bool ChangRuan::GetQrGxBySsq(const CAtlString& ssq,std::string &out)
 	}
 	if(key1=="000")
 	{
-		m_token  = CA2CT(key2.c_str());
+		m_token  = key2.c_str();
 		m_lastMsg= OPT_SUCCESS;
 		return true;
 	}
@@ -834,9 +832,11 @@ bool ChangRuan::QueryQrgx()
 	CosplayIE(&http,m_ip,m_log,"QueryQrgx");
 	http.AddParam("id","queryqrxx");
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("key2",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(http.IsResponseChunk())
 	{
 		rp.clear();
@@ -865,8 +865,8 @@ bool ChangRuan::QueryQrgx()
 	if(key1=="01")
 	{
 		m_ljrzs = (TCHAR*)CA2CT(root["key2"].asString().c_str());
-		m_dqrq = (TCHAR*)CA2CT(root["key5"].asString().c_str());
-		m_token= (TCHAR*)CA2CT(root["key3"].asString().c_str());
+		m_dqrq = root["key5"].asString().c_str();
+		m_token= root["key3"].asString().c_str();
 		//key6下个月
 		m_lastMsg = OPT_SUCCESS;
 		return true;
@@ -874,7 +874,7 @@ bool ChangRuan::QueryQrgx()
 	m_lastMsg = CodeToError(key1);
 	return false;
 }
-bool ChangRuan::BeforeConfirmGx()
+bool ChangRuan::QueryHqssq()
 {
 	if(!crypCtrl)	return false;
 	if(m_ip.IsEmpty()) return false;
@@ -886,9 +886,11 @@ bool ChangRuan::BeforeConfirmGx()
 	std::string rp;
 	CosplayIE(&http,m_ip,m_log,"BeforeConfirmGx");
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("token",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg.Format(_T("BeforeConfirmGx %s"),OPT_DEF_ERROR);
@@ -905,9 +907,9 @@ bool ChangRuan::BeforeConfirmGx()
 	if(key1=="01")
 	{
 		m_lastMsg = OPT_SUCCESS;
-		m_token = CA2CT(root["key2"].asCString());
-		m_cookssq = CA2CT(root["key3"].asCString());
-		m_gxrqfw = CA2CT(root["key4"].asCString());
+		m_token = root["key2"].asCString();
+		m_skssq = root["key3"].asCString();
+		m_gxrqfw = root["key4"].asCString();
 		return true;
 	}
 	m_lastMsg = CodeToError(key1);
@@ -917,56 +919,22 @@ bool ChangRuan::ConfirmGx(std::string &out)
 {
 	if(!crypCtrl)	return false;
 	if(m_ip.IsEmpty()) return false;
-	if(m_cookssq.IsEmpty() || m_gxrqfw.IsEmpty())
-	{
-		if(!BeforeConfirmGx())
-			return false;
-		Sleep(100);
-		if(!QueryQrgx())
-			return false;
-	}
+	if(!QueryHqssq())	return false;
+	if(!QueryQrgx())	return false;
 	curl::CHttpClient http;
-	
-	CAtlString cookie;
-	cookie += _T("dqrq=");
-	cookie += m_dqrq;
-	cookie += _T(";");
-
-	cookie += _T("nsrmc=");
-	cookie += (TCHAR*)CA2CT( http.EncodeUrl((char*)CT2CA(GetUserInfo(),CP_UTF8)).c_str() );
-	cookie += _T(";");
-
-	cookie += _T("skssq=");
-	cookie += (TCHAR*)CA2CT( http.EncodeUrl((char*)CT2CA(m_cookssq)).c_str() );
-	cookie += _T(";");
-	
-	cookie += _T("gxrqfw=");
-	cookie += (TCHAR*)CA2CT( http.EncodeUrl((char*)CT2CA(m_gxrqfw)).c_str() );
-	cookie += _T(";");
-
-	cookie += _T("sxy=");
-	cookie += _T("0002");
-	cookie += _T(";");
-
-	cookie += _T("token=");
-	cookie += (TCHAR*)CA2CT( http.EncodeUrl((char*)CT2CA(m_token)).c_str() );
 	
 	CAtlString url(m_ip);
 	url += _T("/SbsqWW/qrgx.do?callback=jQuery");
 	url += GetTickCount();
-	
-	CAtlString referer(m_ip);
-	referer += _T("/sbqr.08eaffb0.html");
-
 	std::string rp;
-	CosplayIE(&http,referer,m_log,"ConfirmGx");
+	CosplayIE(&http,m_ip,m_log,"ConfirmGx");
 	http.AddParam("id","querysbzt");
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
-	if(!cookie.IsEmpty())
-		http.SetCookie((char*)CT2CA(cookie));
+	http.AddParam("key2",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg.Format(_T("ConfirmGx %s"),OPT_DEF_ERROR);
@@ -993,7 +961,7 @@ bool ChangRuan::ConfirmGx(std::string &out)
 		Json::Value ret;
 		parser.parse(out,ret);
 		ret["qrljcs"]=(char*)CT2CA(m_ljrzs);	//第几次确认勾选
-		ret["ssq"] = (char*)CT2CA(m_cookssq);
+		ret["ssq"] = m_skssq;
 		out = ret.toStyledString();
 		return bRet;
 	}
@@ -1009,7 +977,7 @@ bool ChangRuan::ConfirmGx(std::string &out)
 		Json::Value ret;
 		parser.parse(out,ret);
 		ret["qrljcs"]=(char*)CT2CA(m_ljrzs);	//第几次确认勾选
-		ret["ssq"] = (char*)CT2CA(m_cookssq);
+		ret["ssq"] = m_skssq;
 		out = ret.toStyledString();
 		return bRet;
 	}
@@ -1020,7 +988,7 @@ bool ChangRuan::ConfirmGx(std::string &out)
 		Json::Value ret;
 		parser.parse(out,ret);
 		ret["qrljcs"]=(char*)CT2CA(m_ljrzs);	//第几次确认勾选
-		ret["ssq"] = (char*)CT2CA(m_cookssq);
+		ret["ssq"] = m_skssq;
 		out = ret.toStyledString();
 		return bRet;
 	}
@@ -1049,9 +1017,11 @@ bool ChangRuan::SecondConfirmGx(std::string &out)
 	CosplayIE(&http,m_ip,m_log,"SecondConfirmGx");
 	http.AddParam("id","queryqrhz");
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("key2",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg.Format(_T("SecondConfirmGx %s"),OPT_DEF_ERROR);
@@ -1076,7 +1046,7 @@ bool ChangRuan::SecondConfirmGx(std::string &out)
 	}
 	if (retT=="01") 
 	{
-		m_token = CA2CT(token.c_str());
+		m_token = token.c_str();
 		Json::Value jsonOut;
 		jsonOut["key2"] = retS;
 		jsonOut["key4"] = retO;
@@ -1095,13 +1065,6 @@ bool ChangRuan::SecondConfirmGx(std::string &out)
 				}
 				m_ljhzxxfs = smWhat[1];
 				m_signature = smWhat[2];
-				/*
-				进项管理需要展示数据不能自动提交
-				if(ThirdConfirmGx(m_ljhzxxfs,m_signature))
-				{
-					m_lastMsg = _T("当前状态：待提交");
-					return true;
-				}*/
 				return true;
 			}
 			else
@@ -1146,10 +1109,12 @@ bool ChangRuan::ThirdConfirmGx(const std::string& p1,const std::string& p2)
 	CosplayIE(&http,m_ip,m_log,"ThirdConfirmGx");
 	http.AddParam("id","commitqrxx");
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
+	http.AddParam("key2",m_token);
 	http.AddParam("signature",p2);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg.Format(_T("ThirdConfirmGx %s"),OPT_DEF_ERROR);
@@ -1171,7 +1136,7 @@ bool ChangRuan::ThirdConfirmGx(const std::string& p1,const std::string& p2)
 	}
 	if(key1=="01"&&(key2=="Y"||key2=="YY"))
 	{
-		m_token = CA2CT(root["key3"].asCString());
+		m_token = root["key3"].asCString();
 		m_lastMsg=_T("勾选确认成功");
 		return true;
 	}
@@ -1200,28 +1165,33 @@ bool ChangRuan::GetFpFromGx(const Query& q,std::string &out)
 	http.AddParam("fpdm","");
 	http.AddParam("fphm","");
 	http.AddParam("xfsbh","");
-	if(q.rz==Query::RZ_ALL)
-		http.AddParam("rzzt","-1");
-	else if(q.rz==Query::RZ_YES)
+	if(q.rz==Query::RZ_YES)
 	{
-		http.AddParam("rzzt","1");
 		http.AddParam("rzfs","-1");
+
+		http.AddParam("rzzt","1");
+
+		http.AddParam("gxzt","");
 	}
 	else
 	{
-		http.AddParam("rzzt","0");
 		http.AddParam("rzfs","");
+
+		http.AddParam("rzzt","0");
+
+		http.AddParam("gxzt","0");
 	}
-	http.AddParam("gxzt","-1");
-	http.AddParam("fpzt","-1");
+	http.AddParam("fpzt","0");
 	http.AddParam("fplx","-1");
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
+	http.AddParam("token",m_token);
 	http.AddParam(_T("rq_q"),q.ksrq);
 	http.AddParam(_T("rq_z"),q.jsrq);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("ymbb",m_Ymbb);
 	http.AddParam("aoData",aoData);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0==rp.size())
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -1250,7 +1220,7 @@ bool ChangRuan::GetFpFromGx(const Query& q,std::string &out)
 			m_lastMsg = _T("没有符合条件的记录！");		
 			return false;
 		}
-		m_token = CA2CT(root["key3"].asCString());
+		m_token = root["key3"].asCString();
 		m_lastMsg = OPT_SUCCESS;
 		Json::Value key2 = root["key2"];
 		if(!key2.empty())
@@ -1280,9 +1250,9 @@ bool ChangRuan::QueryDkcx(const Tj& tj,std::string& out)
 	curl::CHttpClient http;
 	CosplayIE(&http,m_ip,m_log,"QueryDkcx");
 	http.AddParam("aoData",aoData);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("ymbb",m_Ymbb);
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
+	http.AddParam("token",m_token);
 	http.AddParam("oper","cx");
 	http.AddParam(_T("fpdm"),tj.fpdm);
 	http.AddParam(_T("fphm"),tj.fphm);
@@ -1296,7 +1266,9 @@ bool ChangRuan::QueryDkcx(const Tj& tj,std::string& out)
 		tmp = tmp.Mid(0,6);
 		http.AddParam(_T("tjyf"),tmp);
 	}
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(http.IsResponseChunk())
 	{
 		rp.clear();
@@ -1325,7 +1297,7 @@ bool ChangRuan::QueryDkcx(const Tj& tj,std::string& out)
 	if(key1=="01")
 	{	
 		out = root["key2"].toStyledString();
-		m_token = CA2CT(root["key3"].asCString());
+		m_token = root["key3"].asCString();
 		m_lastMsg = OPT_SUCCESS;
 		return true;
 	}
@@ -1350,9 +1322,11 @@ bool ChangRuan::QueryQrHzFp(const CAtlString& ssq,std::string& out)
 	http.AddParam("id","querylsqrxx");
 	http.AddParam(_T("ssq"),ssqV);
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("key2",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -1373,8 +1347,7 @@ bool ChangRuan::QueryQrHzFp(const CAtlString& ssq,std::string& out)
 	}
 	if(key1=="01")
 	{
-		std::string token = root["key3"].asString();
-		m_token = CA2CT(token.c_str());
+		m_token= root["key3"].asString();
 		out = root["key2"].toStyledString();
 		size_t bgnPos = out.find('"');
 		size_t endPos = out.rfind('"');
@@ -1405,10 +1378,12 @@ bool ChangRuan::QueryRzfp(const Rz& rz,std::string& out)
 	else if(rz.zt==Rz::RZ_QR)
 		http.AddParam("qrzt","2");
 	http.AddParam(_T("key1"),m_tax);
-	http.AddParam(_T("key2"),m_token);
+	http.AddParam("key2",m_token);
 	http.AddParam("aoData",aoData);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -1431,8 +1406,7 @@ bool ChangRuan::QueryRzfp(const Rz& rz,std::string& out)
 	}
 	if(key1=="01")
 	{
-		std::string token = root["key3"].asString();
-		m_token = CA2CT(token.c_str());
+		m_token = root["key3"].asString();
 		out = key2.toStyledString();
 		m_lastMsg = OPT_SUCCESS;
 		return true;
@@ -1444,6 +1418,18 @@ bool ChangRuan::QueryRzfp(const Rz& rz,std::string& out)
 	}
 	m_lastMsg = CodeToError(key1);
 	return false;
+}
+void ChangRuan::BlankMM()
+{
+	CAtlString url(m_ip);
+	url += _T("/SbsqWW/querymm.do?callback=jQuery");
+	url += GetTickCount();
+	std::string rp;
+	curl::CHttpClient http;
+	CosplayIE(&http,m_ip,m_log,"QueryPubKey");
+	http.AddParam(_T("cert"),m_tax);
+	http.AddParam("funType","02");
+	rp	= http.RequestPost((char*)CT2CA(url),false);
 }
 ChangRuan::MM ChangRuan::QueryPubKey(const char *p)
 {
@@ -1475,7 +1461,7 @@ ChangRuan::MM ChangRuan::QueryPubKey(const char *p)
 		if(0==strcmp(p,"checkInvConf"))
 		{
 			//publickey = $.checkInvConf(cert,getCookie("token") , ts ,'',page);
-			ret.pubkey = GxPt::Encrypt::Get()->checkInvConf((char*)CT2CA(m_tax),(char*)CT2CA(m_token),ret.ts,"",page.GetString());
+			ret.pubkey = GxPt::Encrypt::Get()->checkInvConf((char*)CT2CA(m_tax),m_token,ret.ts,"",page.GetString());
 		}
 	}
 	return ret;
@@ -1523,18 +1509,19 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 
 	std::string rp;
 	curl::CHttpClient http;
-	CosplayIE(&http,m_ip,m_log,"SubmitGx");
+	CosplayIE(&http,m_ip,m_log,"SubmitGx",3000);
 	http.AddParam(_T("fpdm"),fpdms);
 	http.AddParam(_T("fphm"),fphms);
 	http.AddParam(_T("kprq"),kprqs);
 	http.AddParam(_T("zt"),zts);
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("token",m_token);
+	http.AddParam("ymbb",m_Ymbb);
 	http.AddParam("ts",mm.ts);
 	http.AddParam("publickey",mm.pubkey);
-
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = OPT_DEF_ERROR;
@@ -1555,7 +1542,7 @@ bool ChangRuan::SubmitGx(const std::vector<Gx>& gx)
 	}
 	else if(key1=="000")
 	{
-		m_token = CA2CT(root["key2"].asCString());
+		m_token = root["key2"].asCString();
 		m_lastMsg = OPT_SUCCESS;
 		return true;
 	}
@@ -1574,7 +1561,9 @@ bool ChangRuan::Quit()
 	curl::CHttpClient http;
 	CosplayIE(&http,m_ip,m_log,"Quit");
 	http.AddParam(_T("cert"),m_tax);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = _T("请先退出系统");
@@ -1591,6 +1580,7 @@ bool ChangRuan::Quit()
 	rezt = root["key1"].asCString();
 	if(rezt=="01")
 	{
+		m_cookie.clear();
 		m_lastMsg = OPT_SUCCESS;
 		return true;
 	}
@@ -1609,9 +1599,11 @@ bool ChangRuan::QueryQy(std::string& out)
 	curl::CHttpClient http;
 	CosplayIE(&http,m_ip,m_log,"QueryQy");
 	http.AddParam(_T("cert"),m_tax);
-	http.AddParam(_T("token"),m_token);
-	http.AddParam(_T("ymbb"),m_Ymbb);
+	http.AddParam("token",m_token);
+	http.AddParam("ymbb",m_Ymbb);
+	http.SetCookie(MakeCookie());
 	rp	= http.RequestPost((char*)CT2CA(url),false);
+	m_cookie = http.GetCookie();
 	if(0x00!=TakeJson(rp))
 	{
 		m_lastMsg = _T("请先退出系统");
@@ -1630,12 +1622,28 @@ bool ChangRuan::QueryQy(std::string& out)
 	{
 		m_lastMsg = OPT_SUCCESS;
 		out = root["key2"].asCString();
-		m_token = CA2CT(root["key3"].asCString());
+		m_token = root["key3"].asCString();
 		return true;
 	}
 	m_lastMsg=CodeToError(rezt);
 	return false;
-	return false;
+}
+std::string ChangRuan::MakeCookie()
+{
+	curl::CHttpClient http;
+	std::string nsrmc = http.EncodeUrl((char*)CT2CA(GetUserInfo(),CP_UTF8));
+	std::string skssq = http.EncodeUrl(m_skssq);
+	std::string gxrqfw = http.EncodeUrl(m_gxrqfw);
+
+	std::stringstream ss;
+	ss<<m_cookie<<";";
+	//ss<<"dqrq="<<m_dqrq<<";";
+	//ss<<"nsrmc="<<nsrmc<<";";
+	//ss<<"skssq="<<skssq<<";";
+	//ss<<"gxrqfw="<<gxrqfw<<";";
+	//ss<<"token="<<m_token;
+
+	return ss.str();
 }
 void ChangRuan::Release()
 {
@@ -1682,15 +1690,16 @@ bool ChangRuan::OpenDev()
 	}
 	HRESULT hr =0;
 	long nCode = 0;
+	_bstr_t empty(m_pwd);
 	try
 	{
-		hr = crypCtrl->OpenDeviceEx(_bstr_t(m_pwd));
+		hr = crypCtrl->OpenDeviceEx(empty);
 		if(SUCCEEDED(hr))
 		{
 			hr = crypCtrl->get_ErrCode(&nCode);
 			if(nCode==0x57)
 			{
-				if(SUCCEEDED(crypCtrl->OpenDeviceEx(_bstr_t(m_pwd))))
+				if(SUCCEEDED(crypCtrl->OpenDeviceEx(empty)))
 					hr = crypCtrl->get_ErrCode(&nCode);
 			}
 		}
@@ -1744,7 +1753,7 @@ void ChangRuan::CopyData(const ChangRuan& cr)
 	m_skssq = cr.m_skssq;
 	m_area = cr.m_area;
 
-	m_cookssq = cr.m_cookssq;
+	m_cookie = cr.m_cookie;
 	m_gxrqfw  = cr.m_gxrqfw;
 }
 void ChangRuan::EnableAutoQuit(bool b)
@@ -1757,7 +1766,7 @@ namespace GxPt
 	样例数据：
 	{"key1":"01","key2":"0","key3":"201801=61=343784.73=1;201802=34=140601.98=2;201803=129=944751.65=0","key4":"1~0~0~~1~0~0~0~67f28688-8655-4cbe-a297-98acc811374b","key5":"201803;20180418;201804","key6":"20170701-20180331"}
 	*/
-	void HandleRzTjByNf(const std::string& json,RzTjs &out,Ssq &ssq)
+	void HandleRzTjByNf(const std::string& json,RzTjs &out,Ssq &ssq,ValidDate& validDate)
 	{
 		Json::Reader reader;
 		Json::Value  root;
@@ -1767,12 +1776,17 @@ namespace GxPt
 		std::vector<std::string> tmpVals;
 		std::vector<std::string> vals;
 		SplitBy(root["key3"].asCString(),';',tmpVals);
+		if(tmpVals.size()==0 && !root["key3"].asString().empty())
+		{
+			tmpVals.push_back( root["key3"].asString() );
+		}
 		for(size_t t=0;t<tmpVals.size();t++)
 		{
 			RzTj rztj;
 			vals.clear();
-			if(SplitBy(tmpVals[t],'=',vals))
+			if(SplitBy(tmpVals[t],'=',vals)>=4)
 			{
+				//兼容宁夏数据格式
 				rztj.tm = CA2CT(vals[0].c_str());
 				rztj.zhangs = CA2CT(vals[1].c_str());
 				rztj.sehj = CA2CT(vals[2].c_str());
@@ -1784,6 +1798,11 @@ namespace GxPt
 		{
 			ssq.curSSq = CA2CT(tmpVals[0].c_str());
 			ssq.curJzRq = CA2CT(tmpVals[1].c_str());
+		}
+		if(SplitBy(root["key6"].asCString(),'-',tmpVals))
+		{
+			validDate.begin = CA2CT(tmpVals[0].c_str());
+			validDate.end = CA2CT(tmpVals[1].c_str());
 		}
 		return ;
 	}
@@ -1884,9 +1903,9 @@ namespace GxPt
 					qr.pushCurGxTj(jdcbc);
 
 					hybc.column = QrHzFp::HY();
-					hybc.sl = CA2CT(v[13].c_str());
-					hybc.je = CA2CT(v[14].c_str());
-					hybc.se = CA2CT(v[15].c_str());
+					hybc.sl = CA2CT(v[10].c_str());
+					hybc.je = CA2CT(v[11].c_str());
+					hybc.se = CA2CT(v[12].c_str());
 					qr.pushCurGxTj(hybc);
 
 					hjbc.column = QrHzFp::HJ();
@@ -1945,6 +1964,8 @@ namespace GxPt
 		if(key2.size()==0)	return ;
 		std::vector<std::string> avg;
 		SplitBy(key2,';',avg);
+		if(avg.size()==0 && !key2.empty())
+			avg.push_back( key2 );
 		for(size_t t=0;t<avg.size();t++)
 		{
 			std::vector<std::string> result;
@@ -2100,7 +2121,7 @@ namespace GxPt
 		{
 			std::vector<std::string> a;
 			SplitBy(i[szI],'~',a);
-			if(a.size()==0)	continue;
+			if(a.size()==0 || a.size()!=19)	continue;
 			RzGx *pOut = (szI==0?&cur:&dq);
 			pOut->bcqrfpsl = a[0].c_str();
 			pOut->bcyxgxsl = a[1].c_str();
@@ -2145,8 +2166,8 @@ namespace GxPt
 		std::vector<std::string> infoArr;
 		std::string tmp;
 		if(0==SplitBy(json,'=',infoArr))	return ;
-		tmp = http.DecodeUrl(infoArr[0]);
-		out.qymc = CA2CT(tmp.c_str(),CP_UTF8);
+		//tmp = http.DecodeUrl(infoArr[0]);
+		out.qymc = CA2CT(infoArr[0].c_str());
 		if(infoArr[1]=="0")
 			out.sbzq=_T("月");
 		else
@@ -2273,7 +2294,13 @@ namespace GxPt
 			pScriptControl.Release();
 		}
 		catch(_com_error e){
-
+			 MSScriptControl::IScriptErrorPtr scriptPtr = pScriptControl->GetError();
+			 _bstr_t eDesc = scriptPtr->GetDescription();
+			 long eLine = scriptPtr->GetLine();
+			 long eNumber = scriptPtr->GetNumber();
+			 long eColumn = scriptPtr->GetColumn();
+			 int n = 0;
+			 n++;
 		}
 		return ret;
 	}
@@ -2296,7 +2323,13 @@ namespace GxPt
 			pScriptControl.Release();
 		}
 		catch(_com_error e){
-
+			MSScriptControl::IScriptErrorPtr scriptPtr = pScriptControl->GetError();
+			_bstr_t eDesc = scriptPtr->GetDescription();
+			long eLine = scriptPtr->GetLine();
+			long eNumber = scriptPtr->GetNumber();
+			long eColumn = scriptPtr->GetColumn();
+			int n = 0;
+			n++;
 		}
 		return ret;
 	}
@@ -2319,7 +2352,13 @@ namespace GxPt
 			pScriptControl.Release();
 		}
 		catch(_com_error e)	{
-
+			MSScriptControl::IScriptErrorPtr scriptPtr = pScriptControl->GetError();
+			_bstr_t eDesc = scriptPtr->GetDescription();
+			long eLine = scriptPtr->GetLine();
+			long eNumber = scriptPtr->GetNumber();
+			long eColumn = scriptPtr->GetColumn();
+			int n = 0;
+			n++;
 		}
 		return ret;
 	}

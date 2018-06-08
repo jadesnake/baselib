@@ -49,7 +49,7 @@ public:
 	public:
 		Pager()
 		{
-			nMax= _T("500");
+			nMax= _T("50");
 			page=_T("0");
 		}
 		CAtlString nMax;
@@ -175,13 +175,13 @@ public:
 	const CAtlString& GetTaxNo() const	{
 		return m_tax;
 	}
-	const CAtlString& GetDqrq() const {
+	const std::string& GetDqrq() const {
 		return m_dqrq;
 	}
 	const CAtlString& GetLjrzs() const {
 		return m_ljrzs;
 	}
-	const CAtlString& GetToken() const {
+	const std::string& GetToken() const {
 		return m_token;
 	}
 protected:
@@ -190,39 +190,36 @@ protected:
 	bool SecondConfirmGx(std::string &out);
 	bool ThirdConfirmGx(const std::string& p1,const std::string& p2);
 	MM QueryPubKey(const char *p="checkInvConf");
+	void BlankMM();
 
 	CAtlString MakeClientAuthCode(const CAtlString& svrPacket);
 	CAtlString MakeClientHello();
 	bool OpenDev();
 	bool CloseDev();
 	CAtlString GetTickCount();
-	bool BeforeConfirmGx();
+	bool QueryHqssq();
+	std::string MakeCookie();
 public:
-	CAtlString   m_token;
 	CAtlString   m_ip;
 	CAtlString   m_pwd;
 	CAtlString   m_authCode;
 	//通过QueryQrgx接口获取
 	CAtlString   m_ljrzs;	//累计认证次数
-	CAtlString	 m_dqrq;	//当前时间
 	//
-	CAtlString   m_Ymbb;
 	CAtlString	 m_nsrmc;
 	CAtlString   m_svrPacket;
 	CAtlString   m_svrRandom;
-	CAtlString   m_skssq;
 	CAtlString	 m_tax;
 	//用于确认勾选
-	CAtlString   m_cookssq;	//勾选所属期
-	CAtlString   m_gxrqfw;	//勾选范围
 	//
 	AREA m_area;
 private:
 	Log	*m_log;
 	CAtlString   m_lastMsg;
+	std::string	 m_response;
 
 	CComPtr<_CryptCtl>  crypCtrl;
-	
+
 	//勾选确认后返回的数据
 	std::string  m_qrgxData;
 
@@ -230,6 +227,12 @@ private:
 	bool m_hasInitPwd;
 	std::string m_ljhzxxfs;
 	std::string m_signature;		
+	std::string m_cookie;
+	std::string m_gxrqfw;	//勾选范围
+	std::string m_skssq;
+	std::string m_token;
+	std::string	m_dqrq;		//当前时间
+	std::string m_Ymbb;
 };
 //勾选平台
 namespace GxPt
@@ -310,6 +313,12 @@ namespace GxPt
 		CAtlString curSSq;	//当前所属期
 		CAtlString curJzRq;	//所属期截至日期
 	};
+	class ValidDate
+	{
+	public:
+		CAtlString begin;	//有效时间开始
+		CAtlString end;		//有效时间结束
+	};
 	//确认汇总数据
 	class QrHzFp
 	{
@@ -376,7 +385,7 @@ namespace GxPt
 	};
 	typedef std::map<CAtlString,RzTj,SortDesc> RzTjs;
 	//处理GetRzTjByNf 返回的key3值
-	void HandleRzTjByNf(const std::string& json,RzTjs &out,Ssq &ssq);
+	void HandleRzTjByNf(const std::string& json,RzTjs &out,Ssq &ssq,ValidDate& validDate);
 	//处理QueryQrHzFp 返回的key2值
 	void HandleQrHzFp(const std::string& key2,QrHzFp &out);
 	//处理抵扣统计数据
