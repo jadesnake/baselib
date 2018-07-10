@@ -12,8 +12,6 @@ namespace base
  HMODULE GetCurrentModuleHandle();
 
  std::wstring GetHostName();
- std::wstring GetHostIp(const std::wstring& hostname);
-
 
  bool RunApp(const wchar_t *application, HANDLE *process = NULL);
  bool RunAppWithCommand(const wchar_t *application, const wchar_t *command, HANDLE *process = NULL);
@@ -38,12 +36,10 @@ namespace base
  //获取适配器1 mac
  bool GetMacAddressByNetBIOS(std::string &mac_address);
  //获取适配器1 mac
- bool GetMacAddress(std::string &mac);
+ void GetMacAddress(std::string &mac);
 
  BOOL IsWow64();
-
-
-CAtlString GetRegValue(HKEY hKey,const std::string& strKey);
+ CAtlString GetRegValue(HKEY hKey,const std::string& strKey);
 
  std::string  AllocGuidA();
  std::wstring AllocGuidW();

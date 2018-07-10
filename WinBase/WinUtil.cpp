@@ -38,35 +38,7 @@ std::wstring GetHostName()
 	host_name.resize(name_len);
 	return host_name;
 }
-std::wstring GetHostIp(const std::wstring& hostname)
-{
-	std::wstring ret;
-	std::string hn = (char*)CW2A(hostname.c_str());
-	struct hostent *host = gethostbyname(hn.c_str());  
-	if (host == NULL)  
-	{  
-		return ret;
-	}
-	in_addr addr;  
-	memcpy(&addr.S_un.S_addr,host->h_addr_list[0],host->h_length);  
-	char *ipv4 = ::inet_ntoa(addr);
-	ret = CA2W(ipv4);
-	return ret;  
-}
-/*
-std::wstring GetHostName(const std::wstring& hostname)
-{
-	std::wstring ret;
-	std::string ip = (char*)CW2A(hostname.c_str());
-	struct hostent *hptr = NULL;
-	hptr = gethostbyaddr(ip.c_str(),ip.length(),AF_INET);
-	if(hptr==NULL)
-	{
-		return ret;
-	}
 
-	return ret;  
-}*/
 bool IsModuleHandleValid(HMODULE module_handle)
 {
 	if (!module_handle)
@@ -331,7 +303,7 @@ UINT GetAdapterCharacteristics(char* adapter_name)
 //   mac 用于输出 Mac 地址的二进制数据的缓冲区指针  
 // 返回值：成功返回 mac 地址的长度，失败返回 0，失败时 mac 中保存一些简单的错误信息，可适当修改，用于调试  
 //  
-bool GetMacAddress(std::string &out)  
+void GetMacAddress(std::string &out)  
 {  
 	#define NCF_PHYSICAL 0x4
 	char mac[512];
@@ -342,14 +314,14 @@ bool GetMacAddress(std::string &out)
 	{  
 		StringCbPrintfA((LPSTR)mac, sizeof(mac), "GetMAC Failed! ErrorCode: %d", GetLastError());  
 		out = mac;
-		return false;
+		return ;
 	}  
 	void* buffer = malloc(AdapterInfoSize);  
 	if(buffer == NULL)  
 	{  
 		lstrcpyA((LPSTR)mac, "GetMAC Failed! Because malloc failed!");  
 		out = mac;
-		return false;
+		return ;  
 	} 
 	PIP_ADAPTER_INFO pAdapt = (PIP_ADAPTER_INFO)buffer;  
 	if(ERROR_SUCCESS != GetAdaptersInfo(pAdapt, &AdapterInfoSize))  
@@ -357,7 +329,7 @@ bool GetMacAddress(std::string &out)
 		StringCbPrintfA((LPSTR)mac, sizeof(mac), "GetMAC Failed! ErrorCode: %d", GetLastError());  
 		free(buffer); 
 		out = mac;
-		return false;
+		return ;  
 	}  
 	while(pAdapt)  
 	{  
@@ -386,8 +358,7 @@ bool GetMacAddress(std::string &out)
 		}  
 		pAdapt = pAdapt->Next;  
 	}  
-	free(buffer); 
-	return true;
+	free(buffer);  
 }
 
 std::string AllocGuidA()
@@ -473,7 +444,7 @@ BOOL IsWow64()
 		}    
 	}    
 	return bIsWow64;    
-}
+}  
 
 CAtlString GetRegValue(HKEY hKey,const std::string& strKey)
 {
@@ -515,6 +486,5 @@ CAtlString GetRegValue(HKEY hKey,const std::string& strKey)
 	}
 	return strValue;
 }
-
 
 } // namespace base
