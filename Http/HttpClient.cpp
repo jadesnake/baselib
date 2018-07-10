@@ -326,6 +326,8 @@ namespace curl {
 		curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
 		 
 		curl_easy_setopt(m_url, CURLOPT_AUTOREFERER, 1L);
+		curl_easy_setopt(m_url, CURLOPT_FORBID_REUSE, 1L);
+
 		if (!m_cookie.empty()) {
 			curl_easy_setopt(m_url, CURLOPT_COOKIE,m_cookie.c_str());
 		}
@@ -399,7 +401,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestGet(const std::string& url,bool cHeader,bool cParam,bool perform)
 	{
-		CURLcode code;
+		pfmCode = CURL_LAST;
 		if (m_url)
 		{
 			std::string rqFull(url);
@@ -418,7 +420,7 @@ namespace curl {
 			if(cHeader)
 				m_header.clear();
 			if(perform)
-				code = curl_easy_perform(m_url);
+				pfmCode = curl_easy_perform(m_url);
 		}
 		return GetStream();
 	}
@@ -429,7 +431,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestPost(const std::string& url,bool cHeader,bool cParam,bool perform) 
 	{
-		CURLcode code;
+		pfmCode = CURL_LAST;
 		if (m_url)
 		{
 			std::stringstream dbgSS;
@@ -462,7 +464,7 @@ namespace curl {
 			if(bHttps && m_dbg)
 				m_dbg->OnCurlDbgTrace(dbgSS);
 			if(perform)
-				code = curl_easy_perform(m_url);
+				pfmCode = curl_easy_perform(m_url);
 		}
 		return GetStream();
 	}
@@ -472,7 +474,11 @@ namespace curl {
 			return -1;
 		long code = 0;
 		if( CURLE_OK==curl_easy_getinfo(m_url, CURLINFO_RESPONSE_CODE, &code) )
+		{
+			if(code==0&&pfmCode)
+				return pfmCode;
 			return code;
+		}
 		return -1;
 	}
 	bool CHttpClient::IsResponseChunk()

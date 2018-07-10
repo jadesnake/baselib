@@ -118,6 +118,7 @@ namespace curl
 
 		CDebug *m_dbg;
 		bool bHttps;
+		CURLcode pfmCode;	//performcode
 	private:
 		CURL		*m_url;
 		struct curl_slist	 *m_headerlist;
