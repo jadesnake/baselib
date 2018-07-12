@@ -241,7 +241,7 @@ namespace CustomUI
 		}
 		LPCTSTR GetClass() const
 		{
-			return _T("TemplateClick");
+			return _T("ButtonUI");
 		}
 	protected:
 		void DoEvent(DuiLib::TEventUI& event)
