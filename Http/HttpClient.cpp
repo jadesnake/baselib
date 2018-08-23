@@ -131,6 +131,10 @@ namespace curl {
 			return ;
 		m_dbg = dbg;
 	}
+	CDebug*	CHttpClient::GetDebug()
+	{
+		return m_dbg;
+	}
 	void CHttpClient::SetContent(const std::string& data) 
 	{
 		m_rbuf << data;
@@ -484,17 +488,19 @@ namespace curl {
 	bool CHttpClient::IsResponseChunk()
 	{
 		bool chunked = false;
-		char line[512];
+		std::string line;
+		m_headbuf.clear();
 		m_headbuf.seekp(0);
 		m_headbuf.seekg(0);
-		while(m_headbuf.getline(line,sizeof(line)))
+		while(std::getline(m_headbuf,line))
 		{
-			if(0==strcmp(strlwr(line),"transfer-encoding: chunked\r"))
+			std::transform(line.begin(),line.end(),line.begin(),::tolower);
+			if(-1!=line.find("transfer-encoding: chunked"))
 			{
 				chunked = true;
 				break;
 			}
-			else if(0==strcmp(strlwr(line),"headertransfer-encoding: chunked\r"))
+			else if(-1!=line.find("headertransfer-encoding: chunked"))
 			{
 				chunked = true;
 				break;
@@ -565,6 +571,7 @@ namespace curl {
 		bool error = false;
 		long nChuck = -1;
 		char line[512];
+		m_wbuf.clear();
 		m_wbuf.seekp(0);
 		m_wbuf.seekg(0);
 		while(!m_wbuf.eof())
@@ -632,7 +639,7 @@ namespace curl {
 	std::string	CHttpClient::GetHeader()
 	{
 		std::string strRet("");
-		if (m_headbuf.tellp() < 0)
+		if (m_headbuf.str().length()< 0)
 			return strRet;
 		return m_headbuf.str();
 	}

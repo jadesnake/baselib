@@ -100,6 +100,7 @@ namespace curl
 		long		ReqeustCode();
 		void		ClearAll();
 		void		SetDebug(CDebug *dbg);
+		CDebug*		GetDebug();
 	protected:
 		std::string encodeParam();
 		void HandleCookie();
