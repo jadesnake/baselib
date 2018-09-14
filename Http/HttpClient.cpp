@@ -675,8 +675,10 @@ namespace curl {
 		std::string cookie("cookie");
 		std::string line;
 		std::string tmp;
+		m_headbuf.clear();
 		m_headbuf.seekp(0);
 		m_headbuf.seekg(0);
+		m_cookie.clear();
 		while(std::getline(m_headbuf,line))
 		{
 			std::string t1 = line.substr(0,setCookie.length());
@@ -689,19 +691,29 @@ namespace curl {
 			if(t1==setCookie){
 				//跳过:号
 				startPos = t1.length()+1;
-				endPos = line.find(';');
 			}
 			else if(t2==cookie){
 				startPos = t2.length()+1;
-				endPos = line.find(';');
 			}
-			if(startPos && endPos){
-				if(endPos!=-1)
-					tmp = line.substr(startPos,endPos-startPos);
-				else
-					tmp = line.substr(startPos);
-				m_cookie = tmp;
-				break;
+			if(startPos)
+			{
+				//肯能存在多个setCookie
+				if(m_cookie.size())
+				{
+					if(m_cookie[m_cookie.length()-1]!='\n')
+						m_cookie.erase(m_cookie.length()-1,1);
+
+					if(m_cookie[m_cookie.length()-1]!=';')
+						m_cookie += ';';
+				}
+				tmp = line.substr(startPos);
+				if(t1==setCookie)
+					m_cookie += tmp;
+				else if(t2==cookie)
+				{
+					m_cookie = tmp;
+					break;
+				}
 			}
 			//transform(str.begin(), str.end(), str.begin(), ::toupper); //将小写的都转换成大写
 		}		

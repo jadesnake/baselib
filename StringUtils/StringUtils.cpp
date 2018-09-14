@@ -25,4 +25,115 @@ namespace base
 		}
 		return ret.size();
 	}
+	void Replace(std::string &strBase,std::string strSrc,std::string strDes)
+	{
+		std::string::size_type pos = 0;  
+		std::string::size_type srcLen = strSrc.size();  
+		std::string::size_type desLen = strDes.size();  
+		pos=strBase.find(strSrc, pos);   
+		while((pos != std::string::npos))  
+		{  
+			strBase.replace(pos, srcLen, strDes);  
+			pos = strBase.find(strSrc, (pos+desLen));  
+		}  
+	}
+	std::map<std::string,std::string> ParseUrlGetParams(const char* url)
+	{
+		std::map<std::string,std::string> ret;
+		const char *p = strchr(url,'?');
+		if(p==0)			return ret;
+		int szParam = strlen(url) - (url-p);
+		std::string params(p+1,szParam-1);
+		std::vector<std::string> splits;
+		if(params.length()&&0==SplitBy(params,'&',splits))
+			splits.push_back(params);
+		for(size_t s=0;s<splits.size();s++)
+		{
+			std::vector<std::string> vals;
+			if(2==SplitBy(splits[s],'=',vals))
+				ret[vals[0]] = vals[1];
+		}
+		return ret;
+	}
+	std::vector<std::string> GetJsFunParams(const char* jsFun)
+	{
+		std::vector<std::string> ret;
+		const char *p1= strchr(jsFun,'(');
+		const char *p2= strrchr(jsFun,')');
+		if(p1==NULL||p2==NULL)
+			return ret;
+		bool bStr = false;
+		char chFlag = 0;
+		std::string exp(p1+1,p2-p1-1);
+		std::string tmp;
+		exp += ',';
+		for(size_t s=0;s<exp.length();s++)
+		{
+			if(bStr==false&&(exp[s]=='"'||exp[s]=='\'') )
+			{
+				chFlag = exp[s];
+				bStr = true;
+				continue;
+			}
+			if(bStr&&chFlag==exp[s])
+			{
+				chFlag = 0;
+				bStr = false;
+				continue;
+			}
+			if(exp[s]==',')
+			{
+				ret.push_back(tmp);
+				tmp.clear();
+				continue;
+			}
+			tmp += exp[s];
+		}
+		return ret;
+	}
+	std::string GetJsVarStr(const char* var,const std::string& js)
+	{
+		std::string ret,line;
+		std::stringstream ss(js);
+		while(std::getline(ss,line))
+		{
+			std::vector<std::string> exp;
+			if(2==base::SplitBy(line,'=',exp))
+			{
+				if(-1!=exp[0].find(var))
+				{
+					bool bvarVal=false;
+					std::string varVal;
+					char chFlag = 0;
+					for(size_t s=0;s<exp[1].length();s++)
+					{
+						if(exp[1][s]=='"'||exp[1][s]=='\'')
+						{
+							if(bvarVal==false)
+							{
+								bvarVal = true;
+								chFlag = exp[1][s];
+								continue;
+							}
+							else if(chFlag==exp[1][s])
+							{
+								bvarVal = false;
+								break;
+							}
+						}
+						if(bvarVal)
+						{
+							//遇到转义符取下个字符
+							if(exp[1][s]=='\\')
+							 s+=1;
+							varVal += exp[1][s];
+						}
+					}
+					ret = varVal;
+					break;
+				}
+			}
+		}
+		return ret;
+	}
 }
