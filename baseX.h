@@ -163,10 +163,8 @@ namespace base{
 			T* pTemp = p;
 			if (pTemp)
 			{
-				if(0==pTemp->RelRef())
-				{
-					p = NULL;
-				}				
+				p = NULL;
+				pTemp->RelRef();
 			}
 		}
 		// Attach to an existing interface (does not AddRef)
@@ -227,7 +225,7 @@ namespace base{
 	class DLL
 	{
 	public:
-		DLL() : m_dwError(0)
+		DLL() : m_dwError(0),m_hModule(NULL)
 		{
 
 		}
@@ -245,6 +243,7 @@ namespace base{
 			::PathRemoveFileSpec(chMax);	//Éú³ÉdllÂ·¾¶
 			::GetCurrentDirectory(MAX_PATH,chOld);
 			::SetCurrentDirectory(chMax);
+			UnLoad();
 			m_hModule = ::LoadLibrary(pDll);
 			if( m_hModule == NULL )
 			{
@@ -253,6 +252,10 @@ namespace base{
 			::SetCurrentDirectory(chOld);
 		}
 		virtual ~DLL()
+		{
+			UnLoad();
+		}
+		void UnLoad()
 		{
 			if( m_hModule )
 			{

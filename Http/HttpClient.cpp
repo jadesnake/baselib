@@ -2,7 +2,6 @@
 #include "HttpClient.h"
 #include <algorithm>
 namespace curl {
-
 	static int dbg_trace(CURL *handle, curl_infotype type,char *data, size_t size,void *userp)
 	{
 		std::stringstream buf;
@@ -119,6 +118,7 @@ namespace curl {
 		,m_bDecodeBody(false)
 		,m_bEncodeUrl(true)
 		,m_dbg(NULL)
+		,m_bFollowLocation(true)
 	{
 		bHttps = false;
 		m_tmOut = 10000;
@@ -196,6 +196,10 @@ namespace curl {
 	void	CHttpClient::EnableWriteHeader(bool b) 
 	{
 		m_bWriteHeader = b;
+	}
+	void	CHttpClient::EnableFollowLocation(bool b)
+	{
+		m_bFollowLocation = b;
 	}
 	void	CHttpClient::AddBoundary(const std::string& szName, const std::string& szValue, ParamAttr dwParamAttr)
 	{
@@ -327,7 +331,10 @@ namespace curl {
 			curl_easy_setopt(m_url, CURLOPT_USERAGENT, (char*)CT2CA(m_agent, CP_UTF8));
 		
 		curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 100);	//超时单位秒
-		curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
+		if(m_bFollowLocation)
+			curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
+		else
+			curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 0L);
 		 
 		curl_easy_setopt(m_url, CURLOPT_AUTOREFERER, 1L);
 		curl_easy_setopt(m_url, CURLOPT_FORBID_REUSE, 1L);
@@ -405,6 +412,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestGet(const std::string& url,bool cHeader,bool cParam,bool perform)
 	{
+		m_rqUrl = url;
 		pfmCode = CURL_LAST;
 		if (m_url)
 		{
@@ -423,6 +431,7 @@ namespace curl {
 				m_params.clear();
 			if(cHeader)
 				m_header.clear();
+			m_cookie.clear();
 			if(perform)
 				pfmCode = curl_easy_perform(m_url);
 		}
@@ -435,6 +444,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestPost(const std::string& url,bool cHeader,bool cParam,bool perform) 
 	{
+		m_rqUrl = url;
 		pfmCode = CURL_LAST;
 		if (m_url)
 		{
@@ -511,35 +521,14 @@ namespace curl {
 	//有些服务chuck长度和实际数据不一致
 	void readChuckFromStream(std::stringstream &ss,std::string &out,long nlen)
 	{
-		char line[128];
-		long npos = 0;	//块数
-		long nys = 0;	//余数
-		long buflen = 0;
-		if(nlen<sizeof(line))
-		{
-			npos = 1;
-			nys =0;
-			buflen = nlen;
-		}
-		else
-		{
-			buflen = sizeof(line);
-			npos = nlen/sizeof(line);
-			nys = nlen-npos*sizeof(line);
-		}
+		if(nlen==0)	return ;
+		long nowPos = ss.tellg();
+		char *buf = new char[nlen];
+		ss.read(buf,nlen);
+		nowPos = ss.tellg() - nowPos;
 		out.clear();
-		for(long n=0;n<npos;n++)
-		{
-			memset(line,0,sizeof(line));
-			if(ss.read(line,buflen))
-				out.append(line,buflen);
-		}
-		memset(line,0,sizeof(line));
-		if(nys)
-		{
-			if(ss.read(line,nys))
-				out.append(line,nys);
-		}
+		out.append(buf,nowPos);
+		delete []buf;
 	}
 	//有些服务chuck长度和实际数据不一致
 	void readChuckFromStream(std::stringstream &ss,std::string &out)
@@ -570,19 +559,13 @@ namespace curl {
 		}
 		bool error = false;
 		long nChuck = -1;
-		char line[512];
+		std::string line;
 		m_wbuf.clear();
 		m_wbuf.seekp(0);
 		m_wbuf.seekg(0);
-		while(!m_wbuf.eof())
+		while(std::getline(m_wbuf,line))
 		{
-			memset(line,0,sizeof(line));
-			if( !m_wbuf.getline(line,sizeof(line)) )
-			{
-				error = true;
-				break;
-			}
-			sscanf(line, "%x", &nChuck);
+			sscanf(line.c_str(), "%x", &nChuck);
 			if(nChuck==0)
 				break;
 			if(nChuck<0)
@@ -591,8 +574,7 @@ namespace curl {
 				break;
 			}
 			std::string elem;
-			readChuckFromStream(m_wbuf,elem);
-			memset(line,0,sizeof(line));
+			readChuckFromStream(m_wbuf,elem,nChuck);
 			ret.push_back(elem);
 			//读取两个字符判断当前chuck末尾
 			line[0] = m_wbuf.peek();
@@ -629,9 +611,9 @@ namespace curl {
 			trace.flush();
 			m_dbg->OnCurlDbgTrace(trace);
 		}
+		HandleCookie();
 		if(200!=ReqeustCode())
 			return strRet;	//非200返回空
-		HandleCookie();
 		if( m_wbuf.tellp() < 0 ) 
 			return strRet;
 		return m_wbuf.str();
@@ -708,7 +690,10 @@ namespace curl {
 				}
 				tmp = line.substr(startPos);
 				if(t1==setCookie)
+				{
+					m_cookie += "\n";
 					m_cookie += tmp;
+				}
 				else if(t2==cookie)
 				{
 					m_cookie = tmp;

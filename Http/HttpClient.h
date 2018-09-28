@@ -82,7 +82,7 @@ namespace curl
 
 		std::string RequestGet(const CAtlString& url,bool cHeader=true,bool cParam=true,bool perform=true);
 		std::string RequestGet(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
-
+		void EnableFollowLocation(bool b);
 		bool IsResponseChunk();
 
 		std::string GetStream();
@@ -101,9 +101,10 @@ namespace curl
 		void		ClearAll();
 		void		SetDebug(CDebug *dbg);
 		CDebug*		GetDebug();
+		void HandleCookie();
+		std::string m_rqUrl;
 	protected:
 		std::string encodeParam();
-		void HandleCookie();
 	protected:
 		typedef std::multimap<std::string, std::string>	mapStrings;
 		long		m_tmOut;
@@ -112,6 +113,7 @@ namespace curl
 		mapStrings	m_header;
 		mapStrings  m_params;
 		bool		m_bEncodeUrl;
+		bool		m_bFollowLocation;
 
 		std::stringstream	m_wbuf;
 		std::stringstream	m_rbuf;
