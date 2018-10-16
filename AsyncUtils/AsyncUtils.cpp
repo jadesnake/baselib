@@ -66,6 +66,7 @@ namespace base
 	/*-------------------------------------------------------------------------------------*/
 	BackLogicBase::BackLogicBase(HWND win)
 	{
+		m_id = 0;
 		m_thread = NULL;
 		m_quit = NULL;
 		m_run  = NULL;
@@ -97,7 +98,7 @@ namespace base
 			m_quit = ::CreateEvent(NULL,FALSE,FALSE,NULL);
 			m_run = ::CreateEvent(NULL,FALSE,FALSE,NULL);
 			//m_thread = ::CreateThread(NULL,0,(LPTHREAD_START_ROUTINE),0,NULL);
-			m_thread = (HANDLE)_beginthreadex(NULL,0,&BackLogicBase::ThreadProc,this,0,NULL);
+			m_thread = (HANDLE)_beginthreadex(NULL,0,&BackLogicBase::ThreadProc,this,0,&m_id);
 		}
 		::SetEvent(m_run);
 	}
@@ -109,13 +110,17 @@ namespace base
 			UpdateStatus(STOP);
 		}
 	}
-	void BackLogicBase::close()
+	void BackLogicBase::close(DWORD waitTM)
 	{
+		DWORD tid = GetCurrentThreadId();
 		if (m_thread) 
 		{
 			::ResetEvent(m_run);
 			::SetEvent(m_quit);		//½áÊøºóÌ¨
-			::WaitForSingleObject(m_thread,3000);
+			if(m_id!=tid)
+			{
+				::WaitForSingleObject(m_thread,waitTM);
+			}
 			::CloseHandle(m_thread);
 			UpdateStatus(FINISH);
 			m_thread = NULL;
@@ -147,7 +152,6 @@ namespace base
 	}
 	unsigned int BackLogicBase::ThreadProc(void* p1)
 	{
-		
 		BackLogicBase *pT = reinterpret_cast<BackLogicBase*>(p1);
 		HANDLE events[10]={pT->m_quit,pT->m_run};
 		::CoInitialize(NULL);
@@ -166,8 +170,8 @@ namespace base
 			if( bPost && pT->m_win)
 				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);
 		}
-		pT->Done();
 		pT->UpdateStatus(FINISH);
+		pT->Done();
 		::OleUninitialize();
 		::CoUninitialize();		
 		_endthreadex(0xdead);

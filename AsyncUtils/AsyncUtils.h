@@ -26,6 +26,7 @@ namespace base{
 	class classLife
 	{
 	public:
+		virtual ~classLife(){ }
 		virtual void* Query(LPCTSTR pClass) =0;
 		virtual unsigned int AddRef() = 0;
 		virtual unsigned int RelRef() = 0;
@@ -84,7 +85,7 @@ namespace base{
 		virtual ~BackLogicBase(void);
 		void resetWin(HWND win);
 		virtual void start();
-		virtual void close();
+		virtual void close(DWORD waitTM=3000);
 		virtual void stop();
 		virtual Status  getStatus();
 		virtual CAtlString getLastError();
@@ -109,6 +110,7 @@ namespace base{
 		CAtlString m_error;
 		CLock   m_lockStatus;
 		CLock   m_lockError;
+		unsigned m_id;
 		volatile Status m_curStats;
 	};
 	/*--------------------------------------------------------------------------*/

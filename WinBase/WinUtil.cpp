@@ -6,6 +6,7 @@
 #include <snmp.h>
 #include <iphlpapi.h>
 #include <Strsafe.h>
+#include <tlhelp32.h>
 #pragma comment(lib, "Netapi32.lib")
 #pragma comment(lib, "IPHLPAPI.lib")
 namespace base
@@ -444,7 +445,31 @@ BOOL IsWow64()
 		}    
 	}    
 	return bIsWow64;    
-}  
+}
+
+bool IsExistProcess(const CAtlString& szProcessName)
+{
+	bool bRet = false;
+	PROCESSENTRY32 processEntry32;   
+	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
+	if(((int)toolHelp32Snapshot) != -1)  
+	{  
+		processEntry32.dwSize = sizeof(processEntry32);  
+		if (Process32First(toolHelp32Snapshot, &processEntry32))  
+		{  
+			do  
+			{
+				if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
+				{
+					bRet = true;
+					break;
+				}  
+			}while (Process32Next(toolHelp32Snapshot, &processEntry32));  
+		}  
+		CloseHandle(toolHelp32Snapshot);  
+	}
+	return bRet; 
+}
 
 CAtlString GetRegValue(HKEY hKey,const std::string& strKey)
 {

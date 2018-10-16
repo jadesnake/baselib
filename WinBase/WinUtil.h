@@ -7,11 +7,16 @@
 namespace base
 {
  bool IsAddressInCurrentModule(void* address);
+
  bool IsModuleHandleValid(HMODULE module_handle);
+
  HMODULE GetModuleHandleFromAddress(void* address);
+
  HMODULE GetCurrentModuleHandle();
 
  std::wstring GetHostName();
+
+ bool IsExistProcess(const CAtlString& szProcessName);
 
  bool RunApp(const wchar_t *application, HANDLE *process = NULL);
  bool RunAppWithCommand(const wchar_t *application, const wchar_t *command, HANDLE *process = NULL);
