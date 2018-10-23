@@ -86,7 +86,8 @@ namespace curl
 		bool IsResponseChunk();
 
 		std::string GetStream();
-		std::string GetHeader();
+		std::string GetRpHeader(const char* key);
+
 		std::vector<std::string> GetChunks();
 		std::string MakeChunks();
 		//
@@ -102,11 +103,22 @@ namespace curl
 		void		SetDebug(CDebug *dbg);
 		CDebug*		GetDebug();
 		void HandleCookie();
+		void HandleHeader();
+		//内部调用逻辑
+		enum Proc{
+			SaveFile,
+			SaveStream,
+			Upload,
+			SaveHeader,
+		};
+		size_t InsideProc(char *ptr, size_t size, size_t nmemb,Proc proc);
 		std::string m_rqUrl;
 	protected:
 		std::string encodeParam();
 	protected:
 		typedef std::multimap<std::string, std::string>	mapStrings;
+		//应答头部信息
+		std::map<std::string,std::string> m_rpHeaders;
 		long		m_tmOut;
 		CAtlString	m_agent;
 		Proxy		m_tgProxy;

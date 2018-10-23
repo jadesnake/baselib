@@ -49,43 +49,56 @@ namespace curl {
 	}
 	size_t StreamHeader(char *ptr, size_t size, size_t nmemb, void *userdata) 
 	{
-		std::stringstream *buf = static_cast<std::stringstream*>(userdata);
-		if (size)
-		{
-			buf->write(ptr, size*nmemb);
-			buf->flush();
-		}
-		if (buf->tellp() < 0)
-			return 0;
+		CHttpClient::Proc proc = CHttpClient::SaveHeader;
+		CHttpClient *client = static_cast<CHttpClient*>(userdata);
+		client->InsideProc((char*)ptr,size,nmemb,proc);
 		return (size*nmemb);
 	}
 	size_t StreamSave(char *ptr, size_t size, size_t nmemb, void *userdata)
 	{
-		std::stringstream *buf = static_cast<std::stringstream*>(userdata);
-		if( size )
-		{
-			buf->write(ptr,size*nmemb);
-			buf->flush();
-		}
-		if( buf->tellp() < 0 ) 
-			return 0;
+		CHttpClient::Proc proc = CHttpClient::SaveStream;
+		CHttpClient *client = static_cast<CHttpClient*>(userdata);
+		client->InsideProc((char*)ptr,size,nmemb,proc);
 		return (size*nmemb);
 	}
 	size_t StreamSaveFile(char *ptr, size_t size, size_t nmemb, void *userdata)
 	{
-		FILE *buf = static_cast<FILE*>(userdata);
-		size_t written = 0;
-		if (size) {
-			written = fwrite(ptr, size, nmemb, buf);
-		}
+		CHttpClient::Proc proc = CHttpClient::SaveFile;
+		CHttpClient *client = static_cast<CHttpClient*>(userdata);
+		client->InsideProc((char*)ptr,size,nmemb,proc);
 		return (size*nmemb);
 	}
 	size_t StreamUpdate(void *ptr, size_t size, size_t nmemb, void *userdata)
 	{
-		std::stringstream *buf = static_cast<std::stringstream*>(userdata);
-		std::string test = buf->str();
-		buf->read((char*)ptr,size*nmemb);
-		return buf->gcount();
+		CHttpClient::Proc proc = CHttpClient::Upload;
+		CHttpClient *client = static_cast<CHttpClient*>(userdata);
+		return client->InsideProc((char*)ptr,size,nmemb,proc);
+	}
+	size_t CHttpClient::InsideProc(char *ptr, size_t size, size_t nmemb,Proc proc)
+	{
+		if(proc==SaveHeader&&size)
+		{
+			m_headbuf.write(ptr, size*nmemb);
+			m_headbuf.flush();
+			return m_headbuf.tellp();
+		}
+		if(proc==SaveStream&&size)
+		{
+			m_wbuf.write(ptr,size*nmemb);
+			m_wbuf.flush();
+			return m_wbuf.tellp();
+		}
+		if(proc==SaveFile&&size&&m_Save2File)
+		{
+			return fwrite(ptr, size, nmemb, m_Save2File);
+		}
+		if(proc==Upload&&size&&m_Save2File)
+		{
+			std::string test = m_rbuf.str();
+			m_rbuf.read((char*)ptr,size*nmemb);
+			return m_rbuf.gcount();
+		}
+		return 0;
 	}
 	void CHttpClient::GlobalSetup() 
 	{
@@ -361,17 +374,17 @@ namespace curl {
 		if (m_Save2File)
 		{
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSaveFile);
-			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)m_Save2File);
+			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
 		}
 		else
 		{
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSave);
-			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)&m_wbuf);
+			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
 		}
 		if (m_rbuf.tellp()) {
 			curl_off_t nLen = (curl_off_t)m_rbuf.tellp();
 			curl_easy_setopt(m_url, CURLOPT_READFUNCTION, StreamUpdate);
-			curl_easy_setopt(m_url, CURLOPT_READDATA, (void*)&m_rbuf);
+			curl_easy_setopt(m_url, CURLOPT_READDATA, (void*)this);
 		}
 		if (m_tgProxy.nType != Proxy::NONE)
 		{
@@ -382,7 +395,7 @@ namespace curl {
 			curl_easy_setopt(m_url, CURLOPT_PROXYUSERPWD, (char*)CT2CA(m_tgProxy.strPass));
 		}
 		if (m_bWriteHeader) {
-			curl_easy_setopt(m_url, CURLOPT_HEADERDATA, (void*)&m_headbuf);
+			curl_easy_setopt(m_url, CURLOPT_HEADERDATA, (void*)this);
 			curl_easy_setopt(m_url, CURLOPT_HEADERFUNCTION, StreamHeader);
 		}
 		//curl_easy_setopt(m_url, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
@@ -498,23 +511,13 @@ namespace curl {
 	bool CHttpClient::IsResponseChunk()
 	{
 		bool chunked = false;
-		std::string line;
-		m_headbuf.clear();
-		m_headbuf.seekp(0);
-		m_headbuf.seekg(0);
-		while(std::getline(m_headbuf,line))
+		std::string line1 = GetRpHeader("transfer-encoding");
+		std::string line2 = GetRpHeader("headertransfer-encoding");
+		std::transform(line1.begin(),line1.end(),line1.begin(),::tolower);
+		std::transform(line2.begin(),line2.end(),line2.begin(),::tolower);
+		if(-1!=line1.find("chunked")||-1!=line2.find("chunked"))
 		{
-			std::transform(line.begin(),line.end(),line.begin(),::tolower);
-			if(-1!=line.find("transfer-encoding: chunked"))
-			{
-				chunked = true;
-				break;
-			}
-			else if(-1!=line.find("headertransfer-encoding: chunked"))
-			{
-				chunked = true;
-				break;
-			}
+			chunked = true;
 		}
 		return chunked;
 	}
@@ -611,6 +614,7 @@ namespace curl {
 			trace.flush();
 			m_dbg->OnCurlDbgTrace(trace);
 		}
+		HandleHeader();
 		HandleCookie();
 		if(200!=ReqeustCode())
 			return strRet;	//非200返回空
@@ -618,12 +622,20 @@ namespace curl {
 			return strRet;
 		return m_wbuf.str();
 	}
-	std::string	CHttpClient::GetHeader()
+	std::string	CHttpClient::GetRpHeader(const char* key)
 	{
 		std::string strRet("");
 		if (m_headbuf.str().length()< 0)
 			return strRet;
-		return m_headbuf.str();
+		if(key==NULL)
+			return m_headbuf.str();
+		std::string fdKey(key);
+		std::transform(fdKey.begin(), fdKey.end(), fdKey.begin(), ::tolower);
+		std::map<std::string,std::string>::iterator it = m_rpHeaders.find(fdKey);
+		if(it==m_rpHeaders.end())
+			return strRet;
+		strRet = it->second;
+		return strRet;
 	}
 	std::string CHttpClient::DecodeUrl(const std::string &v)
 	{
@@ -651,57 +663,48 @@ namespace curl {
 	const std::string& CHttpClient::GetCookie(){
 		return m_cookie;
 	}
-	void CHttpClient::HandleCookie()
+	void CHttpClient::HandleHeader()
 	{
-		std::string setCookie("set-cookie");
-		std::string cookie("cookie");
 		std::string line;
-		std::string tmp;
 		m_headbuf.clear();
 		m_headbuf.seekp(0);
 		m_headbuf.seekg(0);
-		m_cookie.clear();
+		m_rpHeaders.clear();
 		while(std::getline(m_headbuf,line))
 		{
-			std::string t1 = line.substr(0,setCookie.length());
-			std::string t2 = line.substr(0,cookie.length());
-			if(t1.size())
-				std::transform(t1.begin(), t1.end(), t1.begin(), ::tolower);
-			if(t2.size())
-				std::transform(t2.begin(), t2.end(), t2.begin(), ::tolower); 
-			size_t startPos=0,endPos = 0;
-			if(t1==setCookie){
-				//跳过:号
-				startPos = t1.length()+1;
-			}
-			else if(t2==cookie){
-				startPos = t2.length()+1;
-			}
-			if(startPos)
+			size_t pos = line.find(':');
+			if(pos==std::string::npos)
+				continue;
+			std::string key = line.substr(0,pos);
+			std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+			m_rpHeaders[key] = line.substr(pos+1);
+		}
+	}
+	void CHttpClient::HandleCookie()
+	{
+		std::string setCookie = GetRpHeader("set-cookie");
+		std::string cookie = GetRpHeader("cookie");
+		if(setCookie.size()||cookie.size())
+		{
+			//肯能存在多个setCookie
+			if(m_cookie.size())
 			{
-				//肯能存在多个setCookie
-				if(m_cookie.size())
-				{
-					if(m_cookie[m_cookie.length()-1]!='\n')
-						m_cookie.erase(m_cookie.length()-1,1);
+				if(m_cookie[m_cookie.length()-1]!='\n')
+					m_cookie.erase(m_cookie.length()-1,1);
 
-					if(m_cookie[m_cookie.length()-1]!=';')
-						m_cookie += ';';
-				}
-				tmp = line.substr(startPos);
-				if(t1==setCookie)
-				{
-					m_cookie += "\n";
-					m_cookie += tmp;
-				}
-				else if(t2==cookie)
-				{
-					m_cookie = tmp;
-					break;
-				}
+				if(m_cookie[m_cookie.length()-1]!=';')
+					m_cookie += ';';
 			}
-			//transform(str.begin(), str.end(), str.begin(), ::toupper); //将小写的都转换成大写
-		}		
+			if(setCookie.size())
+			{
+				m_cookie += "\n";
+				m_cookie += setCookie;
+			}
+			else if(cookie.size())
+			{
+				m_cookie = cookie;
+			}
+		}
 	}
 	std::string CHttpClient::encodeParam() 
 	{

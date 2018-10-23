@@ -471,22 +471,89 @@ bool IsExistProcess(const CAtlString& szProcessName)
 	return bRet; 
 }
 
-CAtlString GetRegValue(HKEY hKey,const std::string& strKey)
+Software DumpSoftware(LPCTSTR szKey , HKEY hParent)
+{
+	Software ret;
+	LRESULT lr;
+	HKEY hKey;
+	lr = ::RegOpenKey(hParent, szKey, &hKey);
+	//不能打开注册表
+	if(lr != ERROR_SUCCESS)
+	{		 
+		return ret;
+	} 
+	ret.name = base::GetRegValue(hKey, _T("DisplayName"));
+	if(ret.name.IsEmpty())
+	{
+		ret.name = base::GetRegValue(hKey, _T("QuietDisplayName"));
+	}
+	ret.location = base::GetRegValue(hKey, _T("InstallLocation"));
+	ret.version = base::GetRegValue(hKey, _T("DisplayVersion"));
+	ret.publisher = base::GetRegValue(hKey, _T("Publisher"));
+	ret.url = base::GetRegValue(hKey, _T("URLInfoAbout"));
+	RegCloseKey(hKey);
+	return ret;
+}
+std::vector<Software> DumpInstallSoftware()
+{
+	std::vector<Software> ret;
+	HRESULT hr=0;
+	CAtlString uninstall = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
+	HKEY hKey;
+	REGSAM samDesired = KEY_READ;
+	DWORD cSubKeys = 0;
+	::RegOpenKeyEx(HKEY_LOCAL_MACHINE, uninstall, 0, samDesired, &hKey);
+	::RegQueryInfoKey(hKey,NULL, NULL,NULL,&cSubKeys,NULL, NULL,NULL,NULL, NULL, NULL,NULL);
+	for(DWORD i=0;i<cSubKeys;i++)
+	{
+ 		TCHAR buffer[MAX_PATH];
+		hr = ::RegEnumKey(hKey,i, &buffer[0], sizeof(buffer));
+		switch(hr)
+		{
+		case ERROR_SUCCESS:
+			{
+				Software soft = base::DumpSoftware(buffer,hKey);
+				if(!soft.name.IsEmpty())
+				{
+					ret.push_back( soft );
+				}
+			}
+			break;
+		case ERROR_NO_MORE_ITEMS:
+			RegCloseKey(hKey);
+			break;
+		default:
+			RegCloseKey(hKey);
+			break;
+		}
+	}
+	return ret;
+}
+CAtlString GetRegValue(HKEY hKey,LPCTSTR strKey)
 {
 	CAtlString strValue("");
 	DWORD dwSize = 0;
-	DWORD dwDataType = 0;
-	std::wstring wstrKey = (wchar_t*)CA2W(strKey.c_str());
-	// 获取缓存的长度dwSize及类型dwDataType
-	::RegQueryValueEx(hKey, wstrKey.c_str(), 0, &dwDataType, NULL, &dwSize);
+	DWORD dwDataType = REG_NONE;
+ 	// 获取缓存的长度dwSize及类型dwDataType
+	::RegQueryValueEx(hKey, strKey, 0, &dwDataType, NULL, &dwSize);
 	switch (dwDataType)
 	{
+	case REG_DWORD:
+		{
+			DWORD dwData = 0;
+			//获取注册表中指定的键所对应的值
+			if(ERROR_SUCCESS == ::RegQueryValueEx(hKey,strKey, 0, &dwDataType,(LPBYTE)&dwData, &dwSize))
+			{
+				strValue.Format(_T("%d"),dwData);
+			}
+			break;
+		}
 	case REG_MULTI_SZ:
 		{
 			//分配内存大小
 			BYTE* lpValue = new BYTE[dwSize];
 			//获取注册表中指定的键所对应的值
-			if(ERROR_SUCCESS == ::RegQueryValueEx(hKey, wstrKey.c_str(), 0, &dwDataType, lpValue, &dwSize))
+			if(ERROR_SUCCESS == ::RegQueryValueEx(hKey,strKey, 0, &dwDataType, lpValue, &dwSize))
 			{
 				strValue = lpValue;
 			}
@@ -499,7 +566,7 @@ CAtlString GetRegValue(HKEY hKey,const std::string& strKey)
 			wchar_t* lpValue = new wchar_t[dwSize];
 			memset(lpValue, 0, dwSize * sizeof(wchar_t));
 			//获取注册表中指定的键所对应的值
-			if (ERROR_SUCCESS == ::RegQueryValueEx(hKey, wstrKey.c_str(), 0, &dwDataType, (LPBYTE)lpValue, &dwSize))
+			if (ERROR_SUCCESS == ::RegQueryValueEx(hKey,strKey, 0, &dwDataType, (LPBYTE)lpValue, &dwSize))
 			{
 				strValue = CW2CT(lpValue);
 			}

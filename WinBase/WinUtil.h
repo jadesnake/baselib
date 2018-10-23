@@ -6,6 +6,7 @@
 
 namespace base
 {
+
  bool IsAddressInCurrentModule(void* address);
 
  bool IsModuleHandleValid(HMODULE module_handle);
@@ -44,7 +45,18 @@ namespace base
  void GetMacAddress(std::string &mac);
 
  BOOL IsWow64();
- CAtlString GetRegValue(HKEY hKey,const std::string& strKey);
+
+ CAtlString GetRegValue(HKEY hKey,LPCTSTR strKey);
+
+ typedef struct _Software
+ {
+	 CAtlString name;
+	 CAtlString version;
+	 CAtlString location;
+	 CAtlString publisher;
+	 CAtlString url;
+ }Software;
+ std::vector<Software> DumpInstallSoftware();
 
  std::string  AllocGuidA();
  std::wstring AllocGuidW();
