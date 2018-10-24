@@ -76,7 +76,6 @@ void PeInfoVal::Set(void* data)
 			data_[keys[t]] = GetValue(keys[t],data);
 		}
 	}
-	free(data);
 }
 bool PeInfoVal::IsSuc()
 {
@@ -172,5 +171,6 @@ PeInfoVal GetPeInfo(PCTSTR pcszFileName)
 		return ret;
 	}
 	ret.Set(pBuffer);
+	free(pBuffer);
 	return ret;	
 }

@@ -3,8 +3,6 @@
 #include <vector>
 #include <atlstr.h>
 
-
-
 class PeInfoVal
 {
 public:
