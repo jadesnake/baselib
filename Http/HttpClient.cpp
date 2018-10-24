@@ -8,25 +8,26 @@ namespace curl {
 		switch (type) {
 		case CURLINFO_TEXT:
 			buf << data;
+			break;
 		default: /* in case a new one is introduced to shock us */
 			return 0;
 		case CURLINFO_HEADER_OUT:
-			buf <<std::endl<<"=> Send header";
+			buf <<std::endl<<"header=> ";
 			break;
 		case CURLINFO_DATA_OUT:
-			buf <<std::endl<< "=> Send data";
+			buf <<std::endl<< "data=> ";
 			break;
 		case CURLINFO_SSL_DATA_OUT:
-			buf <<std::endl<< "=> Send SSL data";
+			buf <<std::endl<< "SSL data=> ";
 			break;
 		case CURLINFO_HEADER_IN:
-			buf <<std::endl<< "<= Recv header";
+			buf <<std::endl<< "header<= ";
 			break;
 		case CURLINFO_DATA_IN:
-			buf <<std::endl<< "<= Recv data";
+			buf <<std::endl<< "data<= ";
 			break;
 		case CURLINFO_SSL_DATA_IN:
-			buf <<std::endl<< "<= Recv SSL data";
+			buf <<std::endl<< "SSL data<= ";
 			break;
 		}
 		buf.write((char *)data, size);
@@ -54,6 +55,12 @@ namespace curl {
 		client->InsideProc((char*)ptr,size,nmemb,proc);
 		return (size*nmemb);
 	}
+	int StreamProgress(void *clientp,curl_off_t dltotal,curl_off_t dlnow,curl_off_t ultotal,curl_off_t ulnow)
+	{
+		CHttpClient *client = static_cast<CHttpClient*>(clientp);
+		client->InsideProgress(dltotal,dlnow,ultotal,ulnow);
+		return 0;
+	}
 	size_t StreamSave(char *ptr, size_t size, size_t nmemb, void *userdata)
 	{
 		CHttpClient::Proc proc = CHttpClient::SaveStream;
@@ -74,6 +81,21 @@ namespace curl {
 		CHttpClient *client = static_cast<CHttpClient*>(userdata);
 		return client->InsideProc((char*)ptr,size,nmemb,proc);
 	}
+	size_t CHttpClient::InsideProgress(__int64 dltotal,__int64 dlnow,__int64 ultotal, __int64 ulnow)
+	{
+		if(m_notify)
+		{
+			if(m_rbuf.str().size() && ulnow)
+			{
+				m_notify->OnProgress(ultotal,ulnow);
+			}
+			else if( dlnow )
+			{
+				m_notify->OnProgress(dltotal,dlnow);
+			}
+		}
+		return 1;
+	}
 	size_t CHttpClient::InsideProc(char *ptr, size_t size, size_t nmemb,Proc proc)
 	{
 		if(proc==SaveHeader&&size)
@@ -82,6 +104,11 @@ namespace curl {
 			m_headbuf.flush();
 			return m_headbuf.tellp();
 		}
+		//处理头部信息
+		//if(m_rpHeaders.size()==0)
+		//{
+		//	HandleHeader();
+		//}
 		if(proc==SaveStream&&size)
 		{
 			m_wbuf.write(ptr,size*nmemb);
@@ -131,12 +158,19 @@ namespace curl {
 		,m_bDecodeBody(false)
 		,m_bEncodeUrl(true)
 		,m_dbg(NULL)
+		,m_notify(NULL)
 		,m_bFollowLocation(true)
 	{
 		bHttps = false;
 		m_tmOut = 10000;
 		m_tgProxy.nType = Proxy::NONE;
 		m_url   = curl_easy_init();
+	}
+	void CHttpClient::SetNotify(CNotify *notify)
+	{
+		if(m_notify)
+			return ;
+		m_notify = notify;
 	}
 	void CHttpClient::SetDebug(CDebug *dbg)
 	{
@@ -163,6 +197,11 @@ namespace curl {
 		{
 			m_dbg->OnCurlDbgRelease();
 			m_dbg = NULL;
+		}
+		if(m_notify)
+		{
+			m_notify->OnCurlNotifyRelease();
+			m_notify = NULL;
 		}
 	}
 	void	CHttpClient::ClearAll()
@@ -343,7 +382,6 @@ namespace curl {
 		if(!m_agent.IsEmpty())
 			curl_easy_setopt(m_url, CURLOPT_USERAGENT, (char*)CT2CA(m_agent, CP_UTF8));
 		
-		curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 100);	//超时单位秒
 		if(m_bFollowLocation)
 			curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
 		else
@@ -373,13 +411,23 @@ namespace curl {
 
 		if (m_Save2File)
 		{
+			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);
+
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSaveFile);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
 		}
 		else
 		{
+			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 100);	//超时单位秒
+
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSave);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
+		}
+		if (m_notify)
+		{
+			curl_easy_setopt(m_url,CURLOPT_XFERINFODATA,(void*)this);
+			curl_easy_setopt(m_url,CURLOPT_XFERINFOFUNCTION,StreamProgress);
+			curl_easy_setopt(m_url,CURLOPT_NOPROGRESS, 0L);
 		}
 		if (m_rbuf.tellp()) {
 			curl_off_t nLen = (curl_off_t)m_rbuf.tellp();
@@ -398,7 +446,8 @@ namespace curl {
 			curl_easy_setopt(m_url, CURLOPT_HEADERDATA, (void*)this);
 			curl_easy_setopt(m_url, CURLOPT_HEADERFUNCTION, StreamHeader);
 		}
-		//curl_easy_setopt(m_url, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+		//http 采用chunk传输，引起分块可以使用1.0协议避免分块
+		curl_easy_setopt(m_url, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
 		if(m_dbg)
 		{
 			curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
@@ -446,7 +495,16 @@ namespace curl {
 				m_header.clear();
 			m_cookie.clear();
 			if(perform)
+			{
 				pfmCode = curl_easy_perform(m_url);
+				if(m_notify)
+				{
+					if(pfmCode != CURLE_OK)
+						m_notify->OnComplete(false,curl_easy_strerror(pfmCode));
+					else
+						m_notify->OnComplete(true,"success");
+				}
+			}
 		}
 		return GetStream();
 	}
@@ -491,7 +549,16 @@ namespace curl {
 			if(bHttps && m_dbg)
 				m_dbg->OnCurlDbgTrace(dbgSS);
 			if(perform)
+			{
 				pfmCode = curl_easy_perform(m_url);
+				if(m_notify)
+				{
+					if(pfmCode != CURLE_OK)
+						m_notify->OnComplete(false,curl_easy_strerror(pfmCode));
+					else
+						m_notify->OnComplete(true,"success");
+				}
+			}
 		}
 		return GetStream();
 	}

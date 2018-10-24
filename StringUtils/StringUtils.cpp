@@ -10,7 +10,10 @@ namespace base
 		size_t index=src.find_first_of(delim,last);  
 		if(index==std::string::npos)
 		{
-			return 0;
+			ret.clear();
+			if(!src.empty())
+				ret.push_back(src);
+			return ret.size();
 		}
 		ret.clear();
 		while (index!=std::string::npos)  
@@ -123,7 +126,7 @@ namespace base
 						}
 						if(bvarVal)
 						{
-							//Óöµ½×ªÒå·ûÈ¡ÏÂ¸ö×Ö·û
+							//ï¿½ï¿½ï¿½ï¿½×ªï¿½ï¿½ï¿½È¡ï¿½Â¸ï¿½ï¿½Ö·ï¿?
 							if(exp[1][s]=='\\')
 							 s+=1;
 							varVal += exp[1][s];
