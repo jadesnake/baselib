@@ -471,9 +471,32 @@ bool IsExistProcess(const CAtlString& szProcessName)
 	return bRet; 
 }
 
-Software DumpSoftware(LPCTSTR szKey , HKEY hParent)
+void Software::push(const Software::DATA& d)
 {
-	Software ret;
+	data_[d.id] = d;
+}
+Software::DATA Software::findByName(LPCTSTR name)
+{
+	Software::DATA ret;
+	std::map<CAtlString,DATA>::iterator it = data_.begin();
+	for(;it!=data_.end();it++)
+	{
+		it->second.name==name;
+		return it->second;
+	}
+	return ret;	
+}
+Software::DATA Software::findById(LPCTSTR id)
+{
+	Software::DATA ret;
+	std::map<CAtlString,DATA>::iterator it = data_.find(id);
+	if(it==data_.end())
+		return ret;
+	return it->second;
+}
+Software::DATA DumpSoftware(LPCTSTR szKey , HKEY hParent)
+{
+	Software::DATA ret;
 	LRESULT lr;
 	HKEY hKey;
 	lr = ::RegOpenKey(hParent, szKey, &hKey);
@@ -487,16 +510,19 @@ Software DumpSoftware(LPCTSTR szKey , HKEY hParent)
 	{
 		ret.name = base::GetRegValue(hKey, _T("QuietDisplayName"));
 	}
+	ret.id = szKey;
 	ret.location = base::GetRegValue(hKey, _T("InstallLocation"));
 	ret.version = base::GetRegValue(hKey, _T("DisplayVersion"));
 	ret.publisher = base::GetRegValue(hKey, _T("Publisher"));
 	ret.url = base::GetRegValue(hKey, _T("URLInfoAbout"));
+	ret.uninstall = base::GetRegValue(hKey, _T("UninstallString"));
+	ret.icon = base::GetRegValue(hKey,_T("DisplayIcon"));
 	RegCloseKey(hKey);
 	return ret;
 }
-std::vector<Software> DumpInstallSoftware()
+Software DumpInstallSoftware()
 {
-	std::vector<Software> ret;
+	Software ret;
 	HRESULT hr=0;
 	CAtlString uninstall = _T("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall");
 	HKEY hKey;
@@ -508,25 +534,13 @@ std::vector<Software> DumpInstallSoftware()
 	{
  		TCHAR buffer[MAX_PATH];
 		hr = ::RegEnumKey(hKey,i, &buffer[0], sizeof(buffer));
-		switch(hr)
+		if(hr==ERROR_SUCCESS)
 		{
-		case ERROR_SUCCESS:
-			{
-				Software soft = base::DumpSoftware(buffer,hKey);
-				if(!soft.name.IsEmpty())
-				{
-					ret.push_back( soft );
-				}
-			}
-			break;
-		case ERROR_NO_MORE_ITEMS:
-			RegCloseKey(hKey);
-			break;
-		default:
-			RegCloseKey(hKey);
-			break;
+			Software::DATA soft = base::DumpSoftware(buffer,hKey);
+			ret.push(soft);
 		}
 	}
+	RegCloseKey(hKey);
 	return ret;
 }
 CAtlString GetRegValue(HKEY hKey,LPCTSTR strKey)

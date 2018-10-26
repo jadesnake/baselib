@@ -48,15 +48,30 @@ namespace base
 
  CAtlString GetRegValue(HKEY hKey,LPCTSTR strKey);
 
- typedef struct _Software
+ class Software
  {
-	 CAtlString name;
-	 CAtlString version;
-	 CAtlString location;
-	 CAtlString publisher;
-	 CAtlString url;
- }Software;
- std::vector<Software> DumpInstallSoftware();
+ public:
+	 typedef struct _Data
+	 {
+		 CAtlString name;
+		 CAtlString version;
+		 CAtlString location;
+		 CAtlString publisher;
+		 CAtlString url;
+		 CAtlString uninstall;
+		 CAtlString id;
+		 CAtlString icon;	//DisplayIcon
+		 bool IsSuc(){
+			return (id.IsEmpty()?false:true);
+		 }
+	 }DATA;
+	 void push(const DATA& d);
+	 DATA findByName(LPCTSTR name);
+	 DATA findById(LPCTSTR id);
+ public:
+	 std::map<CAtlString,DATA> data_;
+ };
+ Software DumpInstallSoftware();
 
  std::string  AllocGuidA();
  std::wstring AllocGuidW();

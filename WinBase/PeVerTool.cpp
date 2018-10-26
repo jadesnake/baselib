@@ -2,6 +2,7 @@
 #include "MacroX.h"
 #include "PeVerTool.h"
 #pragma comment(linker, "/defaultlib:version.lib")
+namespace base{
 
 CAtlString PeInfoVal::GetValue(LPCTSTR name,void* data) 
 {
@@ -173,4 +174,6 @@ PeInfoVal GetPeInfo(PCTSTR pcszFileName)
 	ret.Set(pBuffer);
 	free(pBuffer);
 	return ret;	
+}
+
 }
