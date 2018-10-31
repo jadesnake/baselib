@@ -119,7 +119,7 @@ namespace curl {
 		{
 			return fwrite(ptr, size, nmemb, m_Save2File);
 		}
-		if(proc==Upload&&size&&m_Save2File)
+		if(proc==Upload&&size)
 		{
 			std::string test = m_rbuf.str();
 			m_rbuf.read((char*)ptr,size*nmemb);
