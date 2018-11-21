@@ -293,7 +293,7 @@ namespace curl {
 		{
 			std::string file;
 			std::string name = (char*)CT2CA(szName, CP_UTF8);
-			file = (char*)CT2CA(szValue, CP_UTF8);
+			file = (char*)CT2CA(szValue);
 			curl_formadd(&m_postBoundary, &m_lastBoundary,
 				CURLFORM_COPYNAME, name.c_str(),
 				CURLFORM_FILE, file.c_str(),
@@ -301,7 +301,7 @@ namespace curl {
 				CURLFORM_END);
 		}
 		else if (dwParamAttr == ParamFileData) {
-			std::string val = (char*)CT2CA(szValue, CP_UTF8);
+			std::string val = (char*)CT2CA(szValue);
 			std::string name = (char*)CT2CA(szName, CP_UTF8);
 			curl_formadd(&m_postBoundary, &m_lastBoundary,
 				CURLFORM_COPYNAME, "file",
