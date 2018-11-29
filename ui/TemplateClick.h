@@ -4,10 +4,10 @@
 namespace CustomUI
 {
 	template<class Control>
-	class TemplateClick : public Control
+	class ControlClick : public Control
 	{
 	public:
-		TemplateClick()
+		ControlClick()
 		{
 			m_Correct = 0;
 			m_uButtonState = 0;
@@ -19,7 +19,7 @@ namespace CustomUI
 			m_dwHotBorderColor = 0;
 			m_dwHotBorderColor  = 0;
 		}
-		virtual ~TemplateClick()
+		virtual ~ControlClick()
 		{
 
 		}
@@ -152,34 +152,9 @@ namespace CustomUI
 				m_uButtonState = 0;
 			}
 		}
-		SIZE EstimateSize(SIZE szAvailable)
+		UINT  GetControlFlags() const
 		{
-			//针对出现...的文本采用修正值调整宽度
-			RECT rcText = { 0, 0, 9999, 9999 };
-			if( IsShowHtml() )
-			{
-				int nLinks = 0;
-				DuiLib::CRenderEngine::DrawHtmlText(m_pManager->GetPaintDC(), 
-					m_pManager, rcText, m_sText, m_dwTextColor, NULL, NULL, nLinks, 
-					DT_CALCRECT | Control::GetTextStyle() );
-			}
-			else
-			{
-				DuiLib::CRenderEngine::DrawText(m_pManager->GetPaintDC(),
-					m_pManager, rcText, Control::GetText(), 0, Control::GetFont(), DT_CALCRECT|Control::GetTextStyle());
-			}
-			SIZE ret;
-			ret = Control::EstimateSize(szAvailable);
-			long sy = szAvailable.cx - rcText.right;
-			if( sy==0||sy<0 )
-			{
-				ret.cx += m_Correct;
-			}
-			else if( sy<abs(m_Correct) )
-			{
-				ret.cx += sy+m_Correct;
-			}
-			return ret;
+			return UIFLAG_SETCURSOR;
 		}
 		void SetAttribute(LPCTSTR pstrName, LPCTSTR pstrValue)
 		{
@@ -225,10 +200,6 @@ namespace CustomUI
 				LPTSTR pstr = NULL;
 				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
 				SetHotBorderColor(clrColor);
-			}
-			else if( _tcscmp(pstrName, _T("singleline")) == 0 )
-			{
-				Control::SetTextStyle(Control::GetTextStyle()|DT_SINGLELINE);
 			}
 			else
 				Control::SetAttribute(pstrName,pstrValue);
@@ -345,49 +316,6 @@ namespace CustomUI
 				return;
 			}
 			Control::DoEvent(event);
-		}
-		void PaintText(HDC hDC)
-		{
-			bool bPushed = ((m_uButtonState & UISTATE_PUSHED) != 0);
-			if(!bPushed)
-			{
-				Control::PaintText(hDC);
-				return ;
-			}
-			if( IsFocused() ) m_uButtonState |= UISTATE_FOCUSED;
-			else m_uButtonState &= ~ UISTATE_FOCUSED;
-			if( !IsEnabled() ) m_uButtonState |= UISTATE_DISABLED;
-			else m_uButtonState &= ~ UISTATE_DISABLED;
-
-			if( m_dwTextColor == 0 ) m_dwTextColor = m_pManager->GetDefaultFontColor();
-			if( m_dwDisabledTextColor == 0 ) m_dwDisabledTextColor = m_pManager->GetDefaultDisabledColor();
-
-			if( m_sText.IsEmpty() ) return;
-			int nLinks = 0;
-			RECT rc = m_rcItem;
-			rc.left += m_rcTextPadding.left;
-			rc.right -= m_rcTextPadding.right;
-			rc.top += m_rcTextPadding.top;
-			rc.bottom -= m_rcTextPadding.bottom;
-
-			if( bPushed )
-			{
-				rc.top=rc.top+1;
-				rc.bottom=rc.bottom+1;
-			}
-			DWORD clrColor = IsEnabled()?m_dwTextColor:m_dwDisabledTextColor;
-			if( ((m_uButtonState & UISTATE_PUSHED) != 0) && (GetPushedTextColor() != 0) )
-				clrColor = GetPushedTextColor();
-			else if( ((m_uButtonState & UISTATE_HOT) != 0) && (GetHotTextColor() != 0) )
-				clrColor = GetHotTextColor();
-			else if( ((m_uButtonState & UISTATE_FOCUSED) != 0) && (GetFocusedTextColor() != 0) )
-				clrColor = GetFocusedTextColor();
-			if( m_bShowHtml )
-				DuiLib::CRenderEngine::DrawHtmlText(hDC, m_pManager, rc, m_sText, clrColor, \
-				NULL, NULL, nLinks, GetTextStyle() );
-			else
-				DuiLib::CRenderEngine::DrawText(hDC, m_pManager, rc, m_sText, clrColor, \
-				m_iFont, GetTextStyle() );
 		}
 		void PaintBorder(HDC hDC)
 		{
@@ -513,7 +441,7 @@ Label_ForeImage:
 	protected:
 		UINT m_uButtonState;
 		bool m_bButtonDBState;
-		
+
 		int  m_Correct;	//修正值
 
 		DWORD m_dwHotBkColor;
@@ -529,5 +457,139 @@ Label_ForeImage:
 		CAtlString m_sPushedForeImage;
 		CAtlString m_sFocusedImage;
 		CAtlString m_sDisabledImage;
+	};
+
+	template<class Control>
+	class TemplateClick : public ControlClick<Control>
+	{
+	public:
+		virtual ~TemplateClick()
+		{
+
+		}
+		SIZE EstimateSize(SIZE szAvailable)
+		{
+			//针对出现...的文本采用修正值调整宽度
+			RECT rcText = { 0, 0, 9999, 9999 };
+			if( IsShowHtml() )
+			{
+				int nLinks = 0;
+				DuiLib::CRenderEngine::DrawHtmlText(m_pManager->GetPaintDC(), 
+					m_pManager, rcText, m_sText, m_dwTextColor, NULL, NULL, nLinks, 
+					DT_CALCRECT | Control::GetTextStyle() );
+			}
+			else
+			{
+				DuiLib::CRenderEngine::DrawText(m_pManager->GetPaintDC(),
+					m_pManager, rcText, Control::GetText(), 0, Control::GetFont(), DT_CALCRECT|Control::GetTextStyle());
+			}
+			SIZE ret;
+			ret = Control::EstimateSize(szAvailable);
+			long sy = szAvailable.cx - rcText.right;
+			if( sy==0||sy<0 )
+			{
+				ret.cx += m_Correct;
+			}
+			else if( sy<abs(m_Correct) )
+			{
+				ret.cx += sy+m_Correct;
+			}
+			return ret;
+		}
+		void PaintText(HDC hDC)
+		{
+			bool bPushed = ((m_uButtonState & UISTATE_PUSHED) != 0);
+			if(!bPushed)
+			{
+				Control::PaintText(hDC);
+				return ;
+			}
+			if( IsFocused() ) m_uButtonState |= UISTATE_FOCUSED;
+			else m_uButtonState &= ~ UISTATE_FOCUSED;
+			if( !IsEnabled() ) m_uButtonState |= UISTATE_DISABLED;
+			else m_uButtonState &= ~ UISTATE_DISABLED;
+
+			if( m_dwTextColor == 0 ) m_dwTextColor = m_pManager->GetDefaultFontColor();
+			if( m_dwDisabledTextColor == 0 ) m_dwDisabledTextColor = m_pManager->GetDefaultDisabledColor();
+
+			if( m_sText.IsEmpty() ) return;
+			int nLinks = 0;
+			RECT rc = m_rcItem;
+			rc.left += m_rcTextPadding.left;
+			rc.right -= m_rcTextPadding.right;
+			rc.top += m_rcTextPadding.top;
+			rc.bottom -= m_rcTextPadding.bottom;
+
+			if( bPushed )
+			{
+				rc.top=rc.top+1;
+				rc.bottom=rc.bottom+1;
+			}
+			DWORD clrColor = IsEnabled()?m_dwTextColor:m_dwDisabledTextColor;
+			if( ((m_uButtonState & UISTATE_PUSHED) != 0) && (GetPushedTextColor() != 0) )
+				clrColor = GetPushedTextColor();
+			else if( ((m_uButtonState & UISTATE_HOT) != 0) && (GetHotTextColor() != 0) )
+				clrColor = GetHotTextColor();
+			else if( ((m_uButtonState & UISTATE_FOCUSED) != 0) && (GetFocusedTextColor() != 0) )
+				clrColor = GetFocusedTextColor();
+			if( m_bShowHtml )
+				DuiLib::CRenderEngine::DrawHtmlText(hDC, m_pManager, rc, m_sText, clrColor, \
+				NULL, NULL, nLinks, GetTextStyle() );
+			else
+				DuiLib::CRenderEngine::DrawText(hDC, m_pManager, rc, m_sText, clrColor, \
+				m_iFont, GetTextStyle() );
+		}
+		void SetAttribute(LPCTSTR pstrName, LPCTSTR pstrValue)
+		{
+			if( _tcscmp(pstrName,_T("correct"))==0 )	m_Correct = _ttoi(pstrValue);
+			else if( _tcscmp(pstrName, _T("normalimage")) == 0 ) SetNormalImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("hotimage")) == 0 ) SetHotImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("pushedimage")) == 0 ) SetPushedImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("focusedimage")) == 0 ) SetFocusedImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("disabledimage")) == 0 ) SetDisabledImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("foreimage")) == 0 ) SetForeImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("hotforeimage")) == 0 ) SetHotForeImage(pstrValue);
+			else if( _tcscmp(pstrName, _T("hotbkcolor")) == 0 )
+			{
+				if( *pstrValue == _T('#')) pstrValue = ::CharNext(pstrValue);
+				LPTSTR pstr = NULL;
+				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
+				SetHotBkColor(clrColor);
+			}
+			else if( _tcscmp(pstrName, _T("hottextcolor")) == 0 )
+			{
+				if( *pstrValue == _T('#')) pstrValue = ::CharNext(pstrValue);
+				LPTSTR pstr = NULL;
+				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
+				SetHotTextColor(clrColor);
+			}
+			else if( _tcscmp(pstrName, _T("pushedtextcolor")) == 0 )
+			{
+				if( *pstrValue == _T('#')) pstrValue = ::CharNext(pstrValue);
+				LPTSTR pstr = NULL;
+				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
+				SetPushedTextColor(clrColor);
+			}
+			else if( _tcscmp(pstrName, _T("focusedtextcolor")) == 0 )
+			{
+				if( *pstrValue == _T('#')) pstrValue = ::CharNext(pstrValue);
+				LPTSTR pstr = NULL;
+				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
+				SetFocusedTextColor(clrColor);
+			}
+			else if( _tcscmp(pstrName, _T("hotbordercolor")) == 0 )
+			{
+				if( *pstrValue == _T('#')) pstrValue = ::CharNext(pstrValue);
+				LPTSTR pstr = NULL;
+				DWORD clrColor = _tcstoul(pstrValue, &pstr, 16);
+				SetHotBorderColor(clrColor);
+			}
+			else if( _tcscmp(pstrName, _T("singleline")) == 0 )
+			{
+				Control::SetTextStyle(Control::GetTextStyle()|DT_SINGLELINE);
+			}
+			else
+				Control::SetAttribute(pstrName,pstrValue);
+		}
 	};
 }

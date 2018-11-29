@@ -196,7 +196,7 @@ namespace CustomUI
 				return hr;
 			}
 		}
-		if( msg==WM_CHAR )
+		if( msg==WM_CHAR||msg==WM_IME_ENDCOMPOSITION)
 		{
 			bool bInput = true;
 			{
