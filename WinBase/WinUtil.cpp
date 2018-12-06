@@ -7,6 +7,7 @@
 #include <iphlpapi.h>
 #include <Strsafe.h>
 #include <tlhelp32.h>
+#include <Psapi.h>
 #pragma comment(lib, "Netapi32.lib")
 #pragma comment(lib, "IPHLPAPI.lib")
 namespace base
@@ -447,6 +448,63 @@ BOOL IsWow64()
 	return bIsWow64;    
 }
 
+HANDLE FindProcessByPath(const CAtlString& szPath)
+{
+	HANDLE handle=NULL;
+	PROCESSENTRY32 processEntry32;   
+	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
+	if(((int)toolHelp32Snapshot) != -1)  
+	{  
+		processEntry32.dwSize = sizeof(processEntry32);  
+		if (Process32First(toolHelp32Snapshot, &processEntry32))  
+		{  
+			do  
+			{
+				TCHAR chPath[MAX_PATH] = { 0 };
+				HANDLE hTmp = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
+				if(hTmp){
+					::GetModuleFileNameEx(hTmp,NULL,chPath,MAX_PATH);
+					if(szPath==chPath)
+					{
+						handle = hTmp;
+						break;
+					}
+					::CloseHandle(hTmp);
+				}				
+			}while (Process32Next(toolHelp32Snapshot, &processEntry32));  
+		}  
+		CloseHandle(toolHelp32Snapshot);  
+	}
+	return handle;
+}
+bool KillProcess(const CAtlString& szProcessName)
+{
+	bool bRet = false;
+	PROCESSENTRY32 processEntry32;   
+	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
+	if(((int)toolHelp32Snapshot) != -1)  
+	{  
+		processEntry32.dwSize = sizeof(processEntry32);  
+		if (Process32First(toolHelp32Snapshot, &processEntry32))  
+		{  
+			do  
+			{
+				if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
+				{
+					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE,FALSE,processEntry32.th32ProcessID);
+					if(handle){
+						::TerminateProcess(handle,0xdead);
+						::CloseHandle(handle);
+						bRet = true;
+					}
+					break;
+				}  
+			}while (Process32Next(toolHelp32Snapshot, &processEntry32));  
+		}  
+		CloseHandle(toolHelp32Snapshot);  
+	}
+	return bRet;
+}
 bool IsExistProcess(const CAtlString& szProcessName)
 {
 	bool bRet = false;
@@ -481,8 +539,8 @@ Software::DATA Software::findByName(LPCTSTR name)
 	std::map<CAtlString,DATA>::iterator it = data_.begin();
 	for(;it!=data_.end();it++)
 	{
-		it->second.name==name;
-		return it->second;
+		if(it->second.name==name)
+			return it->second;
 	}
 	return ret;	
 }

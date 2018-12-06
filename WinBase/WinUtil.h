@@ -17,7 +17,9 @@ namespace base
 
  std::wstring GetHostName();
 
+ HANDLE FindProcessByPath(const CAtlString& szPath);
  bool IsExistProcess(const CAtlString& szProcessName);
+ bool KillProcess(const CAtlString& szProcessName);
 
  bool RunApp(const wchar_t *application, HANDLE *process = NULL);
  bool RunAppWithCommand(const wchar_t *application, const wchar_t *command, HANDLE *process = NULL);
