@@ -12,6 +12,36 @@
 #pragma comment(lib, "IPHLPAPI.lib")
 namespace base
 {
+bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath)
+{
+	CAtlString keyLink(protocol);
+	CAtlString path(appFilePath);
+	keyLink += _T("\\shell\\open\\command");
+
+	HKEY hKey = NULL,hTmp = NULL;
+	REGSAM samDesired = KEY_READ;
+	::RegOpenKeyEx(HKEY_CLASSES_ROOT, keyLink, 0, samDesired, &hKey);
+	if(hKey)
+	{
+		//注册键值已存在
+		::RegCloseKey(hKey);
+		return true;
+	}
+ 	CAtlString cmd;
+	::RegCreateKey(HKEY_CLASSES_ROOT,protocol,&hKey);
+	::RegSetValueEx(hKey,_T("URL Protocol"),NULL,REG_SZ,
+		(BYTE*)path.GetString(),path.GetAllocLength()*sizeof(TCHAR));
+	//::RegSetValue(hKey,,REG_SZ,path,path.GetAllocLength());
+	::RegCreateKey(hKey,L"DefaultIcon",&hTmp);
+	::RegCreateKey(hKey,L"shell",&hKey);
+	::RegCreateKey(hKey,L"open",&hKey);
+	::RegCreateKey(hKey,L"command",&hKey);
+	cmd.Format(_T("\"%s\" \"%%1\""),path);
+	::RegSetValue(hKey,NULL,REG_SZ,cmd,cmd.GetAllocLength());
+	::RegCloseKey(hKey);
+	return true;
+}
+
 HMODULE GetModuleHandleFromAddress(void* address)
 {
 	MEMORY_BASIC_INFORMATION mbi = {0};

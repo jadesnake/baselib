@@ -6,7 +6,8 @@
 
 namespace base
 {
-
+ bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath);
+ 
  bool IsAddressInCurrentModule(void* address);
 
  bool IsModuleHandleValid(HMODULE module_handle);
