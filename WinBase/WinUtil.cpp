@@ -12,6 +12,7 @@
 #pragma comment(lib, "IPHLPAPI.lib")
 namespace base
 {
+
 bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath)
 {
 	CAtlString keyLink(protocol);
@@ -500,7 +501,7 @@ HANDLE FindProcessByPath(const CAtlString& szPath)
 						break;
 					}
 					::CloseHandle(hTmp);
-				}				
+				}
 			}while (Process32Next(toolHelp32Snapshot, &processEntry32));  
 		}  
 		CloseHandle(toolHelp32Snapshot);  
@@ -510,6 +511,9 @@ HANDLE FindProcessByPath(const CAtlString& szPath)
 bool KillProcess(const CAtlString& szProcessName)
 {
 	bool bRet = false;
+	bool cmpFullDir = false;
+	if(szProcessName.Find(_T(":\\")))
+		cmpFullDir=true;	//按全路径比较	
 	PROCESSENTRY32 processEntry32;   
 	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
 	if(((int)toolHelp32Snapshot) != -1)  
@@ -517,9 +521,25 @@ bool KillProcess(const CAtlString& szProcessName)
 		processEntry32.dwSize = sizeof(processEntry32);  
 		if (Process32First(toolHelp32Snapshot, &processEntry32))  
 		{  
-			do  
+			do
 			{
-				if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
+				if(cmpFullDir)
+				{
+					TCHAR chPath[MAX_PATH] = { 0 };
+					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
+					if(handle){
+						::GetModuleFileNameEx(handle,NULL,chPath,MAX_PATH);
+						if(szProcessName==chPath)
+						{
+							::TerminateProcess(handle,0xdead);
+							::CloseHandle(handle);
+							bRet = true; 
+							break;
+						}
+						::CloseHandle(handle);
+					}
+				}
+				else if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
 				{
 					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE,FALSE,processEntry32.th32ProcessID);
 					if(handle){

@@ -6,8 +6,7 @@
 
 namespace base
 {
- bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath);
- 
+
  bool IsAddressInCurrentModule(void* address);
 
  bool IsModuleHandleValid(HMODULE module_handle);
@@ -50,6 +49,8 @@ namespace base
  BOOL IsWow64();
 
  CAtlString GetRegValue(HKEY hKey,LPCTSTR strKey);
+
+ bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath);
 
  class Software
  {
