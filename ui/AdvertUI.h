@@ -20,7 +20,7 @@ public:
 	LPCTSTR GetClass() const;
 	LPVOID	GetInterface(LPCTSTR pstrName);
 	int	 ReloadRes(LPCTSTR pDir);
-	void SetPos(RECT rc);
+	void SetPos(RECT rc, bool bNeedInvalidate = true);
 	void NextPage();
 	void FrontPage();
 	void SetManager(DuiLib::CPaintManagerUI* pManager,DuiLib::CControlUI* pParent, bool bInit = true);

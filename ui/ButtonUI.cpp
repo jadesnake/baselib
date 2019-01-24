@@ -20,10 +20,10 @@ namespace CustomUI
 		rc.bottom -= m_rcTextPadding.bottom;
 		if( m_bShowHtml )
 			DuiLib::CRenderEngine::DrawHtmlText(hDC, m_pManager, rc, GetText(), GetTextColor(), \
-			NULL, NULL, nLinks, m_uTextStyle);
+			NULL, NULL, nLinks,GetFont(),m_uTextStyle);
 		else
 			DuiLib::CRenderEngine::DrawText(hDC, m_pManager, rc, GetText(), GetTextColor(), \
-			m_iFont, m_uTextStyle);
+			m_iFont,GetFont(),m_uTextStyle);
 		DuiLib::CButtonUI::PaintText(hDC);
 	}
 	void ButtonUI::SetText(LPCTSTR pstrText)
@@ -43,7 +43,8 @@ namespace CustomUI
 		if( m_bShowHtml )
 		{   
 			int nLinks = 0;
-			DuiLib::CRenderEngine::DrawHtmlText(m_pManager->GetPaintDC(), m_pManager, rcText, GetText(), m_dwTextColor, NULL, NULL, nLinks, DT_CALCRECT | m_uTextStyle);
+			DuiLib::CRenderEngine::DrawHtmlText(m_pManager->GetPaintDC(), m_pManager, rcText, GetText(),
+				m_dwTextColor, NULL, NULL, nLinks,GetFont(),DT_CALCRECT|m_uTextStyle);
 		}
 		else 
 		{

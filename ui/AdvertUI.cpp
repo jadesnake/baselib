@@ -132,9 +132,9 @@ void Advert::AppendAdvertImage(LPCTSTR pFile)
 	m_hasResizeBar = true;
 	m_hasResizeShow= true;
 }
-void Advert::SetPos(RECT rc)
+void Advert::SetPos(RECT rc, bool bNeedInvalidate)
 {
-	__super::SetPos(rc);
+	__super::SetPos(rc,bNeedInvalidate);
 	if( m_lstBtns == NULL)
 		return ;
 	RECT rcOpts;
@@ -320,10 +320,10 @@ DuiLib::CControlUI* Advert::FindControl(DuiLib::FINDCONTROLPROC Proc, LPVOID pDa
 }
 void Advert::DoPaint(HDC hDC, const RECT& rcPaint)
 {
-	__super::DoPaint(hDC,rcPaint);
+	__super::DoPaint(hDC,rcPaint,NULL);
 	if( m_lstBtns )
 	{
-		m_lstBtns->DoPaint(hDC,m_lstBtns->GetPos());
+		m_lstBtns->DoPaint(hDC,m_lstBtns->GetPos(),NULL);
 	}
 }
 void Advert::SetAttribute(LPCTSTR pstrName, LPCTSTR pstrValue)

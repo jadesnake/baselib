@@ -40,7 +40,7 @@ namespace CustomUI
 		__super::DoInit();
 		if(IsPasswordMode())
 		{
-			m_pTwh->SetPasswordChar(L'¡ñ');
+			SetPasswordChar(L'¡ñ');
 			EnableIME(false);
 		}		
 	}

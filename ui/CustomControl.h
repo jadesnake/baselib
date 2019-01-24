@@ -67,7 +67,7 @@ namespace CustomUI
 		{
 			return DuiWinBase::GetSkinFolder();
 		}
-		DuiLib::UILIB_RESOURCETYPE GetResourceType() const
+		DuiLib::UILIB_RESTYPE GetResourceType() const
 		{
 			return DuiWinBase::GetResourceType();
 		}
