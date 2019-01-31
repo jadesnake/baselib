@@ -121,6 +121,8 @@ namespace base
 	}
 	bool Calendar::PlusMonth(int v)
 	{
+		int nowDay = GetDay();
+		int nOldDays = GetMonthDays(GetYear(),GetMonth());
 		int nY = 0;	//翻的年数
 		int nM = 0;	//翻的月数
 		if(v>=12)
@@ -143,7 +145,10 @@ namespace base
 		}
 		if( (GetYear()+nY) < 1900 )
 			return false;
-		base::Calendar canlendarTmp(GetYear()+nY,nSelV,GetDay(),GetHour(),GetMinute(),GetSecond());
+		int nNewDays = GetMonthDays(GetYear()+nY,nSelV);
+		if(nowDay>nNewDays)
+			nowDay = nNewDays;
+		base::Calendar canlendarTmp(GetYear()+nY,nSelV,nowDay,GetHour(),GetMinute(),GetSecond());
 		*this = canlendarTmp;
 		return true;
 	}

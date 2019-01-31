@@ -1,7 +1,8 @@
 // calendar.cpp : 定义控制台应用程序的入口点。
 //
-
+#pragma once
 #include <atltime.h>
+
 namespace base{
 
 	class Calendar : public ATL::CTime
