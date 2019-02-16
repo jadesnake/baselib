@@ -92,5 +92,3 @@ bool CopyDir(const CAtlString& dir, const CAtlString& dst,DirFilter *fun);
 bool MoveDir(const CAtlString& dir, const CAtlString& dst);
 
 DWORD CountDirFiles(const CAtlString& dir);
-
-bool RenameFile(const CAtlString& src,const CAtlString& dst);

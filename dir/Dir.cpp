@@ -152,11 +152,13 @@ DWORD 	EnumFloderItem(LPCTSTR lpRoot,DWORD dwAttributes,
 		do
 		{
 			if(  (dwAttributes & tgFindData.dwFileAttributes) == dwAttributes)
-			{			
+			{
+				CAtlString strItemF(chFullPath);
 				PathAppend(chFullPath,tgFindData.cFileName);
 				if( filter )
 					dwError = filter->DirEnumItemProc(chFullPath,lpParam,&tgFindData);
-				PathRemoveFileSpec(chFullPath);
+				memset(chFullPath,0,sizeof(chFullPath));
+				_tcscpy(chFullPath,strItemF.GetString());
 				if(dwError)	throw dwError; 
 			}
 		}while(FindNextFile(hFind, &tgFindData));
@@ -183,14 +185,14 @@ DWORD  CheckDir( LPCTSTR pDir,BOOL bCreate,LPSECURITY_ATTRIBUTES lpSecurity)
 	DWORD dwRet = 0;	
 	LPTSTR pSub  = NULL,pRoot=NULL;
 	CAtlString strTmp,strDir(pDir);
-	//int nDot = strDir.ReverseFind('.');
+	int nDot = strDir.ReverseFind('.');
 	strDir.Replace('/','\\');
-	/*if( nDot != -1 )
+	if( nDot != -1 )
 	{
 		int nSlashes = 0;
 		nSlashes = strDir.ReverseFind('\\');
 		strDir = strDir.Mid(0,nSlashes);
-	}*/
+	}
 	pRoot = (LPTSTR)strDir.GetString();
 	while(pSub = ::PathFindNextComponent(pRoot))
 	{
@@ -423,7 +425,7 @@ CAtlString PathGetFileName(const CAtlString& f)
 		return ret;
 	}
 	nEnd = nEnd_L > nEnd_R ? nEnd_L : nEnd_R;
-	ret = ret.Mid(nEnd + 1, nDot - nEnd - 1);
+	ret = ret.Mid(nEnd + 1);
 	return ret;
 }
 /*---------------------------------------------------------------------------------------------*/
@@ -661,8 +663,4 @@ DWORD	CountDirFiles(const CAtlString& dir)
 	::FindClose(hFind);
 	//清空移动过的目录
 	return dwRet;
-}
-bool RenameFile(const CAtlString& src, const CAtlString& dst)
-{
-	return MoveFileEx(src,dst,MOVEFILE_REPLACE_EXISTING)?true:false;
 }
