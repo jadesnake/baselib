@@ -83,23 +83,28 @@ void CConsole::Output(LPCTSTR szOutput, ...)
 {
 	CHECK(hConsole);
 
-	DWORD		dwWritten;
+	DWORD		dwWritten=0;
 	TCHAR		out[512];
 	va_list		va;
-	
+	DWORD		dwChars = 0;
 	// if not parameter set, write a new line
 	if(szOutput == NULL) 
+	{
 		_stprintf(out,_T("\n"));
+		dwChars = _tcslen(out);
+		WriteConsole(hConsole,out,dwChars,&dwWritten,0);
+	}
 	// process arguments
 	else
 	{
-		va_start(va, szOutput);
-			_vstprintf(out, szOutput, va);
-		va_end(va);	
+		va_start(va,szOutput);
+		do 
+		{
+			dwChars = _tcslen(szOutput);
+			WriteConsole(hConsole,szOutput,dwChars,&dwWritten,0);			 
+		} while(szOutput =va_arg(va,LPCTSTR));
+		va_end(va);
 	}		
-   
-	// write to the console
-	WriteConsole(hConsole,out,_tcslen(out),&dwWritten,0);
 }
 
 void CConsole::SetTitle(LPCTSTR title)
