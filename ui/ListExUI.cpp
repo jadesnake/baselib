@@ -65,7 +65,7 @@ namespace CustomUI
 		sFile += sDest.GetString();
 		m_sBkImage = sFile;
 	}
-	void ListUI::SetPos(RECT rc, bool bNeedInvalidate)
+	void ListUI::SetPos(RECT rc)
 	{
 		RECT rcCur = GetPos();
 		RECT rcBkImgAd = rcBkImg;
@@ -267,7 +267,7 @@ namespace CustomUI
 		}*/
 		if( m_cxyFixed.cy == 0 ) 
 		{
-			return DuiLib::CDuiSize(m_cxyFixed.cx, m_pManager->GetDefaultFontInfo()->tm.tmHeight + 14);
+			return DuiLib::CSize(m_cxyFixed.cx, m_pManager->GetDefaultFontInfo()->tm.tmHeight + 14);
 		}
 		return CContainerUI::EstimateSize(szAvailable);
 	}

@@ -8,7 +8,7 @@ namespace CustomUI
 	public:
 		ListUI(void);
 		//修正 优先计算listbody item，而此时并没有计算Column导致listbody item pos计算不正确
-		void SetPos(RECT rc, bool bNeedInvalidate = true);
+		void SetPos(RECT rc);
 		void ScrollAt(DuiLib::CControlUI *item);
 		void SetBkImage(LPCTSTR pStrImage);
 		void SetAttribute(LPCTSTR pstrName, LPCTSTR pstrValue);

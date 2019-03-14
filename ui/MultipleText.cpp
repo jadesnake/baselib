@@ -202,8 +202,8 @@ namespace CustomUI
 			if( m_bShowHtml )
 			{
 				DuiLib::CRenderEngine::DrawHtmlText(hDC, m_pManager, rc, m_sText,
-					m_dwTextColor,m_rcLinks, m_sLinks, m_nLinks,GetFont(),m_uTextStyle);
- 			}
+					m_dwTextColor,m_rcLinks, m_sLinks, m_nLinks, m_uTextStyle);
+			}
 			else
 			{
 				DWORD clrColor = m_dwTextColor;
@@ -217,7 +217,7 @@ namespace CustomUI
 							true,info->bItalic);
 						if( nFont == -1 )
 						{
-							HFONT hF = m_pManager->AddFont(m_pManager->GetCustomFontCount()+1,info->sFontName,info->iSize,info->bBold,
+							HFONT hF = m_pManager->AddFont(info->sFontName,info->iSize,info->bBold,
 								true,info->bItalic);
 							nFont = m_pManager->GetFontIndex(hF);
 						}
@@ -227,7 +227,7 @@ namespace CustomUI
 				DuiLib::CRenderEngine::DrawText(hDC,m_pManager,rc,m_drawText,
 					clrColor,nFont,m_uTextStyle);
 				if( nFont != m_iFont )
-					m_pManager->RemoveFont(nFont);
+					m_pManager->RemoveFontAt(nFont);
 			}			
 		}
 		else 
@@ -235,7 +235,7 @@ namespace CustomUI
 			if( m_bShowHtml )
 			{
 				DuiLib::CRenderEngine::DrawHtmlText(hDC, m_pManager, rc, m_sText,
-					m_dwDisabledTextColor,m_rcLinks, m_sLinks, m_nLinks,m_iFont,m_uTextStyle);
+					m_dwDisabledTextColor,m_rcLinks, m_sLinks, m_nLinks, m_uTextStyle);
 			}
 			else
 			{

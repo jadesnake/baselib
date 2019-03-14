@@ -7,11 +7,16 @@
 #include "ScannerEdit.h"
 #include "OptionUI.h"
 #include "TemplateClick.h"
+#include "HintEditUI.h"
 namespace CustomUI
 {
 	template<class T>
 	DuiLib::CControlUI* CreateCustomUI(LPCTSTR pstrClass,T *base)
 	{
+		if(_tcscmp(pstrClass,_T("CustomUI::HintEdit"))==0)
+		{
+			return new CustomUI::HintEditUI;
+		}
 		if(_tcscmp(pstrClass,_T("CustomUI::Edit"))==0)
 		{
 			return new CustomUI::EditUI();
@@ -67,7 +72,7 @@ namespace CustomUI
 		{
 			return DuiWinBase::GetSkinFolder();
 		}
-		DuiLib::UILIB_RESTYPE GetResourceType() const
+		DuiLib::UILIB_RESOURCETYPE GetResourceType() const
 		{
 			return DuiWinBase::GetResourceType();
 		}

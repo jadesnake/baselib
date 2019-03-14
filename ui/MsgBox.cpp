@@ -23,7 +23,7 @@ UINT MsgBox::ShowModal(HWND parent,User *user,bool bV)
 	user->DoInit(this);
 	if(szWinInit.cx && szWinInit.cy)
 	{
-		m_pm.SetInitSize(szWinInit.cx,szWinInit.cy);
+		m_PaintManager.SetInitSize(szWinInit.cx,szWinInit.cy);
 		::SetWindowPos(m_hWnd,NULL,0,0,szWinInit.cx,szWinInit.cy,SWP_NOZORDER|SWP_NOMOVE|SWP_NOACTIVATE);
 	}
 	CenterWindow();
@@ -106,9 +106,9 @@ void MsgBox::SetInitSize(SIZE szWin)
 }
 void MsgBox::SetFixedSize(long w,long h)
 {
-	m_pm.SetInitSize(w,h);
-	m_pm.SetMaxInfo(w,h);
-	m_pm.SetMinInfo(w,h);
+	m_PaintManager.SetInitSize(w,h);
+	m_PaintManager.SetMaxInfo(w,h);
+	m_PaintManager.SetMinInfo(w,h);
 	::SetWindowPos(m_hWnd,NULL,0,0,w,h,SWP_NOMOVE|SWP_NOZORDER|SWP_HIDEWINDOW);
 	CenterWindow();
 	if(moveX)
