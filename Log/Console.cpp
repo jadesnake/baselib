@@ -78,7 +78,68 @@ void CConsole::Color(WORD wColor)
 	else
 		SetConsoleTextAttribute(hConsole, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE); // white text on black bg
 }
-
+void CConsole::Output(LEVEL lv,const char* szOutput, ...)
+{
+	CHECK(hConsole);
+	DWORD		dwWritten=0;
+	char		out[512];
+	va_list		va;
+	DWORD		dwChars = 0;
+	if(lv==LV_ERROR)
+		Color(FOREGROUND_RED|FOREGROUND_INTENSITY);
+	else if(lv==LV_WARRING)
+		Color(FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY);
+	else if(lv==LV_TRACE)
+		Color(FOREGROUND_GREEN|FOREGROUND_BLUE|FOREGROUND_INTENSITY);
+	if(szOutput == NULL) 
+	{
+		sprintf(out,"\n");
+		dwChars = strlen(out);
+		WriteConsoleA(hConsole,out,dwChars,&dwWritten,0);
+	}
+	else
+	{
+		va_start(va,szOutput);
+		do 
+		{
+			dwChars = strlen(szOutput);
+			WriteConsoleA(hConsole,szOutput,dwChars,&dwWritten,0);			 
+		} while(szOutput =va_arg(va,const char*));
+		va_end(va);
+	}
+	Color(0);
+}
+void CConsole::Output(LEVEL lv,LPCTSTR szOutput, ...)
+{
+	CHECK(hConsole);
+	DWORD		dwWritten=0;
+	TCHAR		out[512];
+	va_list		va;
+	DWORD		dwChars = 0;
+	if(lv==LV_ERROR)
+		Color(FOREGROUND_RED|FOREGROUND_INTENSITY);
+	else if(lv==LV_WARRING)
+		Color(FOREGROUND_RED|FOREGROUND_GREEN|FOREGROUND_INTENSITY);
+	else if(lv==LV_TRACE)
+		Color(FOREGROUND_GREEN|FOREGROUND_BLUE|FOREGROUND_INTENSITY);
+	if(szOutput == NULL) 
+	{
+		_stprintf(out,_T("\n"));
+		dwChars = _tcslen(out);
+		WriteConsole(hConsole,out,dwChars,&dwWritten,0);
+	}
+	else
+	{
+		va_start(va,szOutput);
+		do 
+		{
+			dwChars = _tcslen(szOutput);
+			WriteConsole(hConsole,szOutput,dwChars,&dwWritten,0);			 
+		} while(szOutput =va_arg(va,LPCTSTR));
+		va_end(va);
+	}
+	Color(0);
+}
 void CConsole::Output(LPCTSTR szOutput, ...)
 {
 	CHECK(hConsole);
@@ -94,7 +155,6 @@ void CConsole::Output(LPCTSTR szOutput, ...)
 		dwChars = _tcslen(out);
 		WriteConsole(hConsole,out,dwChars,&dwWritten,0);
 	}
-	// process arguments
 	else
 	{
 		va_start(va,szOutput);
@@ -104,7 +164,7 @@ void CConsole::Output(LPCTSTR szOutput, ...)
 			WriteConsole(hConsole,szOutput,dwChars,&dwWritten,0);			 
 		} while(szOutput =va_arg(va,LPCTSTR));
 		va_end(va);
-	}		
+	}
 }
 
 void CConsole::SetTitle(LPCTSTR title)

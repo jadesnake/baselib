@@ -4,6 +4,8 @@
 #include <Winsock2.h>
 #include <mswsock.h>
 #include <Ws2tcpip.h>
+#include <vector>
+#include <algorithm>
 #if !defined(BASE_CODE)
 	#if ( _WIN32_WINNT >= 0x0500 )
 		#define BASE_CODE	(16000L)	//对于Windows2000以后系统函数返回信息至16000之后开始
@@ -32,6 +34,7 @@ typedef struct _tgSocketKey
 	OVERLAPPED	tgOverlap;
 	INT			nOperateType;
 	DWORD		dwID;			//包标签
+	SOCKET		sock;
 	LPVOID		lpValue;		//
 }SOCKETKEY,*PSOCKETKEY;
 /************************************************************************\
@@ -163,6 +166,7 @@ public:
 
 	DWORD	Listen(int nBacklog = SOMAXCONN);
 	
+	DWORD	Accept(IN DWORD dwID,IN DWORD dwDataBufLen,IN BOOL bInherit = TRUE,OUT DWORD *dwIdentify = NULL);
 	DWORD	AcceptEx(IN DWORD dwID,IN SOCKET ConnectedSocket,IN DWORD dwDataBufLen,IN BOOL bInherit = TRUE,OUT DWORD *dwIdentify = NULL);
 
 	DWORD	ConnectEx(DWORD dwID,const SOCKADDR *cpName,PVOID pSendBuffer,DWORD dwSendDataLen,DWORD *dwIdentify);
@@ -171,12 +175,16 @@ public:
 					DWORD *dwIdentify = NULL,UINT unAf = AF_INET);
 
 	DWORD	Receive(DWORD dwID,DWORD dwBufLen,DWORD &dwFlags,DWORD *dwIdentify);
+	//读取远端数据
+	DWORD   ReadRemote(DWORD dwID,DWORD idx,DWORD dwBufLen,DWORD &dwFlags,DWORD *dwIdentify);
 
 	DWORD	PeekInputQueue(char* const pBuf,DWORD dwBufLen,DWORD &dwRecvLen,long lOvertime);
 	
 	DWORD	IsConnect(long lOvertime);
 
 	DWORD	Send(DWORD dwID,char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD *dwIdentify);
+	//写入远端数据
+	DWORD   WriteRemote(DWORD dwID,DWORD idx,char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD *dwIdentify);
 
 	DWORD	ReceiveFrom(DWORD dwID,DWORD dwLength,DWORD &dwFlags,const char* szAddress,int nPort,DWORD *dwIdentify);
 	DWORD	ReceiveFrom(DWORD dwID,DWORD dwLength,DWORD &dwFlags,SOCKADDR *lpFrom,int &nFromLen,DWORD *dwIdentify);
@@ -188,7 +196,8 @@ public:
 				   const char* lpAddress,int nPort,short nAf);
 
 	DWORD	Disconnect(DWORD dwID,DWORD dwFlags,DWORD Reserved,DWORD *dwIdentify);
-	
+	DWORD	CloseRemote(DWORD dwID,DWORD idx,DWORD dwFlags,DWORD Reserved,DWORD *dwIdentify);
+
 	DWORD	WaitSocketComplete(DWORD &dwID,UINT &nOperateType,PVOID *lpOptVal,DWORD dwMilliseconds);
 
 	void	ParserAcceptEx(HANDLE hHeap,PACCEPTEX lpData,PACCEPTEXINFO pInfo);
@@ -202,6 +211,7 @@ public:
 	DWORD	Release(DWORD dwExitCode);
 
 	DWORD	Associate(HANDLE hIocp,DWORD dwKey);
+	DWORD	Associate(SOCKET nSock);
 
 	DWORD	PostUserDefined(DWORD dwID,const BlockX &pUserX,DWORD *dwIdentify);
 
@@ -217,9 +227,12 @@ public:
 protected:
 	DWORD	Associate(HANDLE hIocp,SOCKET nSock);
 	DWORD	OnFailedFreeMemory(PVOID lpData,UINT nOperateType);
+	void pushSock(SOCKET s);
+	void popSock(SOCKET s);
+	SOCKET indexSock(int i);
 protected:
-	DWORD	OnAcceptEx(HANDLE hHeap,PACCEPTEX pAcceptEx,PACCEPTEXINFO *lpInfo,DWORD dwNumOfBytesTransfer);
-	DWORD	OnConnectEx(HANDLE hHeap,PCONNECTEX pConnectEx,DWORD dwNumOfBytesTransfer);
+	virtual DWORD OnAcceptEx(HANDLE hHeap,PACCEPTEX pAcceptEx,PACCEPTEXINFO *lpInfo,DWORD dwNumOfBytesTransfer);
+	virtual DWORD OnConnectEx(HANDLE hHeap,PCONNECTEX pConnectEx,DWORD dwNumOfBytesTransfer);
 private:
 	LPFN_ACCEPTEX				m_lpfnAcceptEx;				//AcceptEx Function Pointer
 	LPFN_GETACCEPTEXSOCKADDRS	m_lpfnGetAcceptExSockaddrs;	//GetAcceptExSockaddrs Function Pointer
@@ -227,7 +240,11 @@ private:
 	LPFN_DISCONNECTEX			m_lpfnDisconnectEx;			//DisconnectEx Function Pointer
 	HANDLE						m_hIocp;					//Socket io complete Handle
 	BOOL						m_bAutoClean;				//Auto Clean flag
-	HANDLE						m_hHeap;					//Memory Heap	
+	HANDLE						m_hHeap;					//Memory Heap
+	int m_sockType;
+	
+	std::vector<SOCKET>  m_rcvSocks; //remote socket
+	CRITICAL_SECTION  m_lkRcvSocks;
 };
 
 #include "JadeSocketIocp.inl"
