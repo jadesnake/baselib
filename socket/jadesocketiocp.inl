@@ -49,6 +49,7 @@ JadeSocketIocp< BlockX >::~JadeSocketIocp()
 		CloseHandle(m_hIocp);
 		m_hIocp = NULL;
 	}
+	closeAllSock();
 	DeleteCriticalSection(&m_lkRcvSocks);
 }
 
@@ -465,43 +466,6 @@ DWORD	JadeSocketIocp< BlockX >::AcceptEx(DWORD dwID,SOCKET ConnectedSocket,DWORD
 	}
 }
 template< typename BlockX>
-void JadeSocketIocp< BlockX >::pushSock(SOCKET s)
-{
-	EnterCriticalSection(&m_lkRcvSocks);
-	m_rcvSocks.push_back(s);
-	LeaveCriticalSection(&m_lkRcvSocks);
-}
-template< typename BlockX>
-void JadeSocketIocp< BlockX >::popSock(SOCKET s)
-{
-	EnterCriticalSection(&m_lkRcvSocks);
-	if(s==0)
-		m_rcvSocks.pop_back();
-	else
-	{
-		std::vector<SOCKET>::iterator it = std::find(m_rcvSocks.begin(),m_rcvSocks.end(),s);
-		if(it!=m_rcvSocks.end())
-			m_rcvSocks.erase(it);
-	}
-	LeaveCriticalSection(&m_lkRcvSocks);
-}
-template< typename BlockX>
-SOCKET JadeSocketIocp< BlockX >::indexSock(int i)
-{
-	SOCKET s = 0;
-	EnterCriticalSection(&m_lkRcvSocks);
-	for(size_t t=0;t<m_rcvSocks.size();t++)
-	{
-		if(t==i)
-		{
-			s = m_rcvSocks[t];
-			break;
-		}
-	}
-	LeaveCriticalSection(&m_lkRcvSocks);
-	return s;
-}
-template< typename BlockX>
 DWORD	JadeSocketIocp< BlockX >::Accept(DWORD dwID,DWORD dwDataBufLen,BOOL bInherit,DWORD *dwIdentify)
 {
 	SOCKET sock = WSASocket(AF_INET,m_sockType,IPPROTO_IP,NULL,0,WSA_FLAG_OVERLAPPED);
@@ -583,6 +547,8 @@ DWORD	JadeSocketIocp< BlockX >::WaitSocketComplete(DWORD &dwID,UINT &nOperateTyp
 			pRecv = (PRECV)pSockKey->lpValue;
 			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSockKey);
 			pRecv->dwLen = dwNumOfTransfer;
+			if(dwNumOfTransfer==0)
+				popSock(pSockKey->sock);
 			*lpOptVal	 = (PVOID)pRecv;
 			break;
 		case SOCKET_RECVFROM:
@@ -911,100 +877,6 @@ DWORD	JadeSocketIocp< BlockX >::ConnectEx(DWORD dwID,const char* lpszHostAddress
 	}
 }
 template< typename BlockX >
-DWORD   JadeSocketIocp< BlockX >::ReadRemote(DWORD dwID,DWORD idx,DWORD dwBufLen,DWORD &dwFlags,DWORD *dwIdentify)
-{
-	SOCKET sRemote = indexSock(idx);
-	if(sRemote==0)
-		return -1;
-	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0;
-	WSABUF		tgBuf	=	{ 0 };
-	PSOCKETKEY	pKey	=	NULL;
-	PRECV		pRecv	=	NULL;
-	if(dwFlags == MSG_PEEK)		return (DWORD)-1;
-	try
-	{
-		pKey	=	(PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
-		if(!pKey)
-			throw (DWORD)-1;
-		pRecv	=	(PRECV)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(RECV));
-		if(!pRecv)
-			throw (DWORD)-1;
-		pRecv->pBuf = (char*)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,dwBufLen);
-		if(!pRecv->pBuf)
-			throw (DWORD)-1;
-		pKey->nOperateType	=	SOCKET_RECV;
-		pKey->lpValue		=	(void*)pRecv;
-		pKey->dwID			=	dwID;
-		tgBuf.len	=	dwBufLen;
-		tgBuf.buf	=	(char*)pRecv->pBuf;
-		dwRetVal = WSARecv(sRemote,&tgBuf,1,NULL,&dwFlags,&pKey->tgOverlap,NULL);
-		dwRetVal = WSAGetLastError();
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))	
-			*dwIdentify = (DWORD)pKey;
-		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
-	}
-	catch (DWORD dwCode)
-	{
-		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);
-		if(pRecv && !IsBadReadPtr(pKey,sizeof(RECV)))
-		{
-			if(pRecv->pBuf != NULL && !IsBadReadPtr(pRecv->pBuf,pRecv->dwLen))
-				HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pRecv->pBuf);
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pRecv);
-		}
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = 0;
-		return dwCode;
-	}
-}
-template< typename BlockX >
-DWORD	JadeSocketIocp< BlockX >::Receive(DWORD dwID,DWORD dwBufLen,DWORD &dwFlags,DWORD *dwIdentify)
-{
-	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0;
-	WSABUF		tgBuf	=	{ 0 };
-	PSOCKETKEY	pKey	=	NULL;
-	PRECV		pRecv	=	NULL;
-	if(dwFlags == MSG_PEEK)		return (DWORD)-1;
-	try
-	{
-		pKey	=	(PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
-		if(!pKey)
-			throw (DWORD)-1;
-		pRecv	=	(PRECV)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(RECV));
-		if(!pRecv)
-			throw (DWORD)-1;
-		pRecv->pBuf = (char*)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,dwBufLen);
-		if(!pRecv->pBuf)
-			throw (DWORD)-1;
-		pKey->nOperateType	=	SOCKET_RECV;
-		pKey->lpValue		=	(void*)pRecv;
-		pKey->dwID			=	dwID;
-		tgBuf.len	=	dwBufLen;
-		tgBuf.buf	=	(char*)pRecv->pBuf;
-		dwRetVal = WSARecv(m_socket,&tgBuf,1,NULL,&dwFlags,&pKey->tgOverlap,NULL);
-		dwRetVal = WSAGetLastError();
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))	
-			*dwIdentify = (DWORD)pKey;
-		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
-	}
-	catch (DWORD dwCode)
-	{
-		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);
-		if(pRecv && !IsBadReadPtr(pKey,sizeof(RECV)))
-		{
-			if(pRecv->pBuf != NULL && !IsBadReadPtr(pRecv->pBuf,pRecv->dwLen))
-				HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pRecv->pBuf);
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pRecv);
-		}
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = 0;
-		return dwCode;
-	}
-}
-
-template< typename BlockX >
 DWORD	JadeSocketIocp< BlockX >::RecvDisconnect(LPCTSTR lpBuf,DWORD dwBufLen)
 {
 	WSABUF	tgBuf = { 0 };
@@ -1022,206 +894,6 @@ DWORD	JadeSocketIocp< BlockX >::RecvDisconnect(LPCTSTR lpBuf,DWORD dwBufLen)
 		return dwCode;
 	}
 	return dwRetVal ? WSAGetLastError() : 0;
-}
-
-template< typename BlockX >
-DWORD	JadeSocketIocp< BlockX >::PeekInputQueue(char* const pBuf,DWORD dwBufLen,DWORD &dwRecvLen,long lOvertime)
-{
-	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0,dwFlags = MSG_PEEK;
-	WSABUF		tgNetBuf = { 0 };
-	fd_set		fdopt,fdEx;
-	FD_ZERO(&fdopt);FD_ZERO(&fdEx);
-	FD_SET(m_socket,&fdopt);FD_SET(m_socket,&fdEx);
-	timeval	tval = { 0 };
-	tval.tv_usec = lOvertime*10000 ;	//输入毫秒转换为微秒
-	try
-	{
-		if(pBuf == NULL || IsBadWritePtr(pBuf,dwBufLen))
-			throw (DWORD)-1;
-		ZeroMemory(pBuf,dwBufLen);
-		tgNetBuf.buf = (char*)pBuf;
-		tgNetBuf.len = dwBufLen;
-		dwRetVal = select(1,&fdopt,NULL,&fdEx,&tval);
-		if(FD_ISSET(m_socket,&fdopt))
-		{
-			FD_CLR(m_socket,&fdopt);
-			dwRetVal = WSARecv(m_socket,&tgNetBuf,1,&dwRecvLen,&dwFlags,NULL,NULL);
-			if(dwRetVal == SOCKET_ERROR )
-				throw	(DWORD)WSAGetLastError();
-			return 0;
-		}
-		else	if(FD_ISSET(m_socket,&fdEx))
-		{
-			FD_CLR(m_socket,&fdEx);
-			throw (DWORD)ERROR_OOBDATA;
-		}
-		switch(dwRetVal)
-		{
-		case 0 :
-			throw (DWORD)WAIT_TIMEOUT;
-		case SOCKET_ERROR:
-			throw (DWORD)WSAGetLastError();
-		}
-	}
-	catch(DWORD dwCode)
-	{
-		return dwCode;
-	}
-	catch(...)
-	{
-
-		return -1;
-	}
-	return dwRetVal;
-}
-
-template< typename BlockX >
-DWORD	JadeSocketIocp< BlockX >::IsConnect(long lOvertime)
-{
-	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0,dwFlags = MSG_PEEK;
-	WSABUF		tgNetBuf = { 0 };
-	TCHAR		chBuf = 0;
-	fd_set		fdRecv,fdSend;
-	FD_ZERO(&fdRecv);FD_ZERO(&fdSend);
-	FD_SET(m_socket,&fdRecv);FD_SET(m_socket,&fdSend);
-	timeval	tval = { 0 };
-	tval.tv_sec = lOvertime;	//输入毫秒转换为微秒
-	tgNetBuf.buf = &chBuf;
-	tgNetBuf.len = sizeof(chBuf);
-	try
-	{
-		dwRetVal = select(0,&fdRecv,&fdSend,NULL,&tval);
-		if(dwRetVal == 0)	throw (DWORD)WAIT_TIMEOUT;
-		if( FD_ISSET(m_socket,&fdSend) )
-		{
-			FD_CLR(m_socket,&fdSend);
-			throw (DWORD)0;	//还处于连接状态		
-		}
-		else if( FD_ISSET(m_socket,&fdRecv) )
-		{
-			FD_CLR(m_socket,&fdRecv);
-			dwRetVal = WSARecv(m_socket,&tgNetBuf,1,&dwNumOfBytesRecvd,&dwFlags,NULL,NULL);
-			if(dwRetVal)	throw	(DWORD)WSAGetLastError();
-			if(dwRetVal == 0 && dwNumOfBytesRecvd == 0)	throw (DWORD)-1;	//
-		}
-	}
-	catch(DWORD dwCode)
-	{
-
-		return dwCode;
-	}
-	catch(...)
-	{
-		
-		return -1;
-	}
-	return dwRetVal;
-}
-template< typename BlockX >
-DWORD   JadeSocketIocp< BlockX >::WriteRemote(DWORD dwID,DWORD idx,char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD *dwIdentify)
-{
-	SOCKET sRemote = indexSock(idx);
-	if(sRemote==0)
-		return -1;
-	DWORD		dwRetVal = 0,dwNumOfBytesSend = 0;
-	WSABUF		tgBuf	=	{ 0 };
-	PSOCKETKEY	pKey	=	NULL;
-	PSEND		pSend	=	NULL;
-	if(pBuf == NULL)
-		return (DWORD)-1;
-	try
-	{
-		pKey	=	(PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
-		if(!pKey)
-			throw (DWORD)-1;
-		pSend	=	(PSEND)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SEND));
-		if(!pSend)
-			throw (DWORD)-1;
-		pSend->pBuf = (char*)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,dwBufLen);
-		if( !pSend->pBuf )
-			throw (DWORD)-1;
-		pKey->nOperateType	=	SOCKET_SEND;
-		pKey->lpValue		=	(void*)pSend;
-		pKey->dwID			=	dwID;
-		//偏移信息保存
-		memcpy(pSend->pBuf,pBuf,dwBufLen);
-		pSend->dwBufLen = dwBufLen;
-		pSend->dwPos    = dwPos;
-		//使用偏移量确保同一数据包第一次发送未完成时可以下次继续发送		
-		tgBuf.len = dwBufLen-dwPos;
-		tgBuf.buf = pBuf+dwPos;
-		dwRetVal = WSASend(sRemote,&tgBuf,1,&dwNumOfBytesSend,dwFlags,&pKey->tgOverlap,NULL);
-		dwRetVal = WSAGetLastError();
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = (DWORD)pKey;
-		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
-	}
-	catch(DWORD dwCode)
-	{
-		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);
-		if(pSend && !IsBadReadPtr(pSend,sizeof(SEND)))
-		{
-			if( pSend->pBuf )
-				HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSend->pBuf);
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSend);
-		}
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = 0;
-		return dwCode;
-	}
-}
-template< typename BlockX >
-DWORD	JadeSocketIocp< BlockX >::Send(DWORD dwID,char* pBuf,DWORD dwBufLen,
-									   DWORD dwPos,DWORD dwFlags,DWORD *dwIdentify)
-{
-	DWORD		dwRetVal = 0,dwNumOfBytesSend = 0;
-	WSABUF		tgBuf	=	{ 0 };
-	PSOCKETKEY	pKey	=	NULL;
-	PSEND		pSend	=	NULL;
-	if(pBuf == NULL)
-		return (DWORD)-1;
-	try
-	{
-		pKey	=	(PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
-		if(!pKey)
-			throw (DWORD)-1;
-		pSend	=	(PSEND)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SEND));
-		if(!pSend)
-			throw (DWORD)-1;
-		pSend->pBuf = (char*)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,dwBufLen);
-		if( !pSend->pBuf )
-			throw (DWORD)-1;
-		pKey->nOperateType	=	SOCKET_SEND;
-		pKey->lpValue		=	(void*)pSend;
-		pKey->dwID			=	dwID;
-		//偏移信息保存
-		memcpy(pSend->pBuf,pBuf,dwBufLen);
-		pSend->dwBufLen = dwBufLen;
-		pSend->dwPos    = dwPos;
-		//使用偏移量确保同一数据包第一次发送未完成时可以下次继续发送		
-		tgBuf.len = dwBufLen-dwPos;
-		tgBuf.buf = pBuf+dwPos;
-		dwRetVal = WSASend(m_socket,&tgBuf,1,&dwNumOfBytesSend,dwFlags,&pKey->tgOverlap,NULL);
-		dwRetVal = WSAGetLastError();
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = (DWORD)pKey;
-		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
-	}
-	catch(DWORD dwCode)
-	{
-		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);
-		if(pSend && !IsBadReadPtr(pSend,sizeof(SEND)))
-		{
-			if( pSend->pBuf )
-				HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSend->pBuf);
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSend);
-		}
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = 0;
-		return dwCode;
-	}
 }
 
 template< typename BlockX >
@@ -1426,38 +1098,6 @@ DWORD	JadeSocketIocp< BlockX >::CloseRemote(DWORD dwID,DWORD idx,DWORD dwFlags,D
 		return dwCode;
 	}
 }
-
-template< typename BlockX >
-DWORD	JadeSocketIocp< BlockX >::Disconnect(DWORD dwID,DWORD dwFlags,DWORD Reserved,DWORD *dwIdentify)
-{
-	DWORD		dwRetVal = 0;
-	PSOCKETKEY	pKey	 = NULL;
-	if(m_lpfnDisconnectEx == NULL || IsBadReadPtr(m_lpfnDisconnectEx,sizeof(LPFN_DISCONNECTEX)))
-		return -1;
-	try
-	{
-		pKey = (PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
-		if(!pKey)
-			throw (DWORD)-1;
-		pKey->nOperateType = SOCKET_DISCONNECTEX;
-		pKey->dwID		   = dwID;
-		pKey->sock         = m_socket;
-		dwRetVal = m_lpfnDisconnectEx(m_socket,&pKey->tgOverlap,dwFlags,Reserved);
-		dwRetVal = WSAGetLastError();
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = (DWORD)pKey;
-		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
-	}
-	catch (DWORD dwCode)
-	{
-		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
-			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);	
-		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
-			*dwIdentify = NULL;
-		return dwCode;
-	}
-}
-
 template< typename BlockX >
 DWORD	JadeSocketIocp< BlockX >::Attach(SOCKET tgSock)
 {
@@ -1641,6 +1281,7 @@ DWORD	JadeSocketIocp< BlockX >::ReleaseAll(void)
 		}
 		CloseHandle(m_hIocp);
 		m_hIocp = NULL;
+		closeAllSock();
 		closesocket(m_socket);
 		m_socket = NULL;
 		if(m_bAutoClean)
@@ -1651,4 +1292,279 @@ DWORD	JadeSocketIocp< BlockX >::ReleaseAll(void)
 		return dwCode;
 	}
 	return dwRetVal;
+}
+//长连接
+
+template< typename BlockX >
+DWORD	JadeSocketIocp< BlockX >::IsConnect(long lOvertime,SOCKET s)
+{
+	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0,dwFlags = MSG_PEEK;
+	WSABUF		tgNetBuf = { 0 };
+	TCHAR		chBuf = 0;
+	fd_set		fdRecv,fdSend;
+	FD_ZERO(&fdRecv);
+	FD_ZERO(&fdSend);
+	FD_SET(s,&fdRecv);
+	FD_SET(s,&fdSend);
+	timeval	tval = { 0 };
+	tval.tv_sec = lOvertime;	//输入毫秒转换为微秒
+	tgNetBuf.buf = &chBuf;
+	tgNetBuf.len = sizeof(chBuf);
+	try
+	{
+		dwRetVal = select(0,&fdRecv,&fdSend,NULL,&tval);
+		if(dwRetVal == 0)	throw (DWORD)WAIT_TIMEOUT;
+		if( FD_ISSET(s,&fdSend) )
+		{
+			FD_CLR(s,&fdSend);
+			throw (DWORD)0;	//还处于连接状态		
+		}
+		else if( FD_ISSET(s,&fdRecv) )
+		{
+			FD_CLR(s,&fdRecv);
+			dwRetVal = WSARecv(s,&tgNetBuf,1,&dwNumOfBytesRecvd,&dwFlags,NULL,NULL);
+			if(dwRetVal)	throw	(DWORD)WSAGetLastError();
+			if(dwRetVal == 0 && dwNumOfBytesRecvd == 0)	throw (DWORD)-1;	//
+		}
+	}
+	catch(DWORD dwCode)
+	{
+
+		return dwCode;
+	}
+	catch(...)
+	{
+
+		return -1;
+	}
+	return dwRetVal;
+}
+template< typename BlockX >
+DWORD	JadeSocketIocp< BlockX >::PeekInputQueue(char* const pBuf,DWORD dwBufLen,DWORD &dwRecvLen,long lOvertime,SOCKET s)
+{
+	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0,dwFlags = MSG_PEEK;
+	WSABUF		tgNetBuf = { 0 };
+	fd_set		fdopt,fdEx;
+	FD_ZERO(&fdopt);
+	FD_ZERO(&fdEx);
+	FD_SET(s,&fdopt);
+	FD_SET(s,&fdEx);
+	timeval	tval = { 0 };
+	tval.tv_usec = lOvertime*10000 ;	//输入毫秒转换为微秒
+	try
+	{
+		if(pBuf == NULL || IsBadWritePtr(pBuf,dwBufLen))
+			throw (DWORD)-1;
+		ZeroMemory(pBuf,dwBufLen);
+		tgNetBuf.buf = (char*)pBuf;
+		tgNetBuf.len = dwBufLen;
+		dwRetVal = select(1,&fdopt,NULL,&fdEx,&tval);
+		if(FD_ISSET(s,&fdopt))
+		{
+			FD_CLR(s,&fdopt);
+			dwRetVal = WSARecv(s,&tgNetBuf,1,&dwRecvLen,&dwFlags,NULL,NULL);
+			if(dwRetVal == SOCKET_ERROR )
+				throw	(DWORD)WSAGetLastError();
+			return 0;
+		}
+		else	if(FD_ISSET(s,&fdEx))
+		{
+			FD_CLR(s,&fdEx);
+			throw (DWORD)ERROR_OOBDATA;
+		}
+		switch(dwRetVal)
+		{
+		case 0 :
+			throw (DWORD)WAIT_TIMEOUT;
+		case SOCKET_ERROR:
+			throw (DWORD)WSAGetLastError();
+		}
+	}
+	catch(DWORD dwCode)
+	{
+		return dwCode;
+	}
+	catch(...)
+	{
+
+		return -1;
+	}
+	return dwRetVal;
+}
+template< typename BlockX >
+DWORD	JadeSocketIocp< BlockX >::Disconnect(DWORD dwFlags,DWORD dwID,DWORD *dwIdentify,SOCKET s)
+{
+	DWORD		dwRetVal = 0;
+	PSOCKETKEY	pKey	 = NULL;
+	if(m_lpfnDisconnectEx == NULL || IsBadReadPtr(m_lpfnDisconnectEx,sizeof(LPFN_DISCONNECTEX)))
+		return -1;
+	try
+	{
+		pKey = (PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
+		if(!pKey)
+			throw (DWORD)-1;
+		pKey->nOperateType = SOCKET_DISCONNECTEX;
+		pKey->dwID		   = dwID;
+		pKey->sock         = s;
+		dwRetVal = m_lpfnDisconnectEx(s,&pKey->tgOverlap,dwFlags,0);
+		dwRetVal = WSAGetLastError();
+		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
+			*dwIdentify = (DWORD)pKey;
+		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
+	}
+	catch (DWORD dwCode)
+	{
+		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
+			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);	
+		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
+			*dwIdentify = NULL;
+		return dwCode;
+	}
+}
+template< typename BlockX >
+DWORD	JadeSocketIocp< BlockX >::Receive(DWORD dwBufLen,DWORD &dwFlags,DWORD dwID,DWORD *dwIdentify,SOCKET s)
+{
+	DWORD		dwRetVal = 0,dwNumOfBytesRecvd = 0;
+	WSABUF		tgBuf	=	{ 0 };
+	PSOCKETKEY	pKey	=	NULL;
+	PRECV		pRecv	=	NULL;
+	if(dwFlags == MSG_PEEK)		return (DWORD)-1;
+	try
+	{
+		pKey	=	(PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
+		if(!pKey)
+			throw (DWORD)-1;
+		pRecv	=	(PRECV)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(RECV));
+		if(!pRecv)
+			throw (DWORD)-1;
+		pRecv->pBuf = (char*)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,dwBufLen);
+		if(!pRecv->pBuf)
+			throw (DWORD)-1;
+		pKey->nOperateType	=	SOCKET_RECV;
+		pKey->lpValue		=	(void*)pRecv;
+		pKey->dwID			=	dwID;
+		pKey->sock  = s;
+		pRecv->sock = s;
+		tgBuf.len	=	dwBufLen;
+		tgBuf.buf	=	(char*)pRecv->pBuf;
+		dwRetVal = WSARecv(s,&tgBuf,1,NULL,&dwFlags,&pKey->tgOverlap,NULL);
+		dwRetVal = WSAGetLastError();
+		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))	
+			*dwIdentify = (DWORD)pKey;
+		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
+	}
+	catch (DWORD dwCode)
+	{
+		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
+			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);
+		if(pRecv && !IsBadReadPtr(pKey,sizeof(RECV)))
+		{
+			if(pRecv->pBuf != NULL && !IsBadReadPtr(pRecv->pBuf,pRecv->dwLen))
+				HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pRecv->pBuf);
+			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pRecv);
+		}
+		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
+			*dwIdentify = 0;
+		return dwCode;
+	}
+}
+template< typename BlockX >
+DWORD	JadeSocketIocp< BlockX >::Send(char* pBuf,DWORD dwBufLen,DWORD dwPos,
+									   DWORD dwFlags,DWORD dwID,DWORD *dwIdentify,SOCKET s)
+{
+	DWORD		dwRetVal = 0,dwNumOfBytesSend = 0;
+	WSABUF		tgBuf	=	{ 0 };
+	PSOCKETKEY	pKey	=	NULL;
+	PSEND		pSend	=	NULL;
+	if(pBuf==NULL||s<=0)
+		return (DWORD)-1;
+	try
+	{
+		pKey	=	(PSOCKETKEY)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SOCKETKEY));
+		if(!pKey)
+			throw (DWORD)-1;
+		pSend	=	(PSEND)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,sizeof(SEND));
+		if(!pSend)
+			throw (DWORD)-1;
+		pSend->pBuf = (char*)HeapAlloc(m_hHeap,HEAP_ZERO_MEMORY,dwBufLen);
+		if( !pSend->pBuf )
+			throw (DWORD)-1;
+		pKey->nOperateType	=	SOCKET_SEND;
+		pKey->lpValue		=	(void*)pSend;
+		pKey->dwID			=	dwID;
+		pKey->sock = s; 
+		//偏移信息保存
+		memcpy(pSend->pBuf,pBuf,dwBufLen);
+		pSend->dwBufLen = dwBufLen;
+		pSend->dwPos    = dwPos;
+		pSend->sock = s;
+		//使用偏移量确保同一数据包第一次发送未完成时可以下次继续发送		
+		tgBuf.len = dwBufLen-dwPos;
+		tgBuf.buf = pBuf+dwPos;
+		dwRetVal = WSASend(s,&tgBuf,1,&dwNumOfBytesSend,dwFlags,&pKey->tgOverlap,NULL);
+		dwRetVal = WSAGetLastError();
+		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
+			*dwIdentify = (DWORD)pKey;
+		return (dwRetVal != ERROR_IO_PENDING)&&(dwRetVal != 0) ? throw dwRetVal : ERROR_IO_PENDING;
+	}
+	catch(DWORD dwCode)
+	{
+		if(pKey && !IsBadReadPtr(pKey,sizeof(SOCKETKEY)))
+			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pKey);
+		if(pSend && !IsBadReadPtr(pSend,sizeof(SEND)))
+		{
+			if( pSend->pBuf )
+				HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSend->pBuf);
+			HeapFree(m_hHeap,HEAP_ZERO_MEMORY,pSend);
+		}
+		if(!IsBadWritePtr(dwIdentify,sizeof(DWORD)))
+			*dwIdentify = 0;
+		return dwCode;
+	}
+}
+template< typename BlockX>
+void JadeSocketIocp< BlockX >::closeAllSock()
+{
+	EnterCriticalSection(&m_lkRcvSocks);
+	for(size_t t=0;t<m_rcvSocks.size();t++)
+	{
+		closesocket(m_rcvSocks[t]);
+	}
+	m_rcvSocks.clear();
+	LeaveCriticalSection(&m_lkRcvSocks);
+}
+template< typename BlockX>
+void JadeSocketIocp< BlockX >::pushSock(SOCKET s)
+{
+	EnterCriticalSection(&m_lkRcvSocks);
+	m_rcvSocks.push_back(s);
+	LeaveCriticalSection(&m_lkRcvSocks);
+}
+template< typename BlockX>
+void JadeSocketIocp< BlockX >::popSock(SOCKET s)
+{
+	EnterCriticalSection(&m_lkRcvSocks);
+	std::vector<SOCKET>::iterator it = std::find(m_rcvSocks.begin(),m_rcvSocks.end(),s);
+	if(it!=m_rcvSocks.end())
+	{
+		m_rcvSocks.erase(it);
+		closesocket(s);
+	}
+	LeaveCriticalSection(&m_lkRcvSocks);
+}
+template< typename BlockX>
+SOCKET JadeSocketIocp< BlockX >::indexSock(int i)
+{
+	SOCKET s = 0;
+	EnterCriticalSection(&m_lkRcvSocks);
+	for(size_t t=0;t<m_rcvSocks.size();t++)
+	{
+		if(t==i)
+		{
+			s = m_rcvSocks[t];
+			break;
+		}
+	}
+	LeaveCriticalSection(&m_lkRcvSocks);
+	return s;
 }

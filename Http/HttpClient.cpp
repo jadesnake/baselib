@@ -470,7 +470,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestGet(const CAtlString& url,bool cHeader,bool cParam,bool perform)
 	{
-		return RequestGet((char*)CT2CA(url),perform);
+		return RequestGet((char*)CT2CA(url),cHeader,cParam,perform);
 	}
 	std::string CHttpClient::RequestGet(const std::string& url,bool cHeader,bool cParam,bool perform)
 	{
@@ -511,7 +511,7 @@ namespace curl {
 
 	std::string	CHttpClient::RequestPost(const CAtlString& url,bool cHeader,bool cParam,bool perform)
 	{
-		return RequestPost((char*)CT2CA(url),perform,cHeader,cParam);
+		return RequestPost((char*)CT2CA(url),cHeader,cParam,perform);
 	}
 	std::string CHttpClient::RequestPost(const std::string& url,bool cHeader,bool cParam,bool perform) 
 	{

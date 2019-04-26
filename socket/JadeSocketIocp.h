@@ -83,6 +83,7 @@ typedef struct _tgRecv
 {
 	char	*pBuf;
 	DWORD	dwLen;
+	SOCKET  sock;
 }RECV,*PRECV,FAR *LPRECV;
 /************************************************************************\
 					結構名稱：Send
@@ -95,6 +96,7 @@ typedef struct _tgSend
 	char	*pBuf;			//发送缓冲区
 	DWORD	dwBufLen;		//发送缓冲区长度
 	DWORD	dwPos;			//当前游标位置
+	SOCKET  sock;
 }SEND,*PSEND,FAR *LPSEND;
 /************************************************************************\
 					結構名稱：RecvFrom
@@ -173,18 +175,33 @@ public:
 
 	DWORD	ConnectEx(DWORD dwID,const char* lpszHostAddress,UINT nHostPort,PVOID pSendBuffer,DWORD dwSendDataLen,
 					DWORD *dwIdentify = NULL,UINT unAf = AF_INET);
-
-	DWORD	Receive(DWORD dwID,DWORD dwBufLen,DWORD &dwFlags,DWORD *dwIdentify);
-	//读取远端数据
-	DWORD   ReadRemote(DWORD dwID,DWORD idx,DWORD dwBufLen,DWORD &dwFlags,DWORD *dwIdentify);
-
-	DWORD	PeekInputQueue(char* const pBuf,DWORD dwBufLen,DWORD &dwRecvLen,long lOvertime);
-	
-	DWORD	IsConnect(long lOvertime);
-
-	DWORD	Send(DWORD dwID,char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD *dwIdentify);
-	//写入远端数据
-	DWORD   WriteRemote(DWORD dwID,DWORD idx,char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD *dwIdentify);
+ 
+	DWORD ClientSend(char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD dwID,DWORD *dwIdentify)
+	{
+		return Send(pBuf,dwBufLen,dwPos,dwFlags,dwID,dwIdentify,m_socket);
+	}
+	DWORD ClientReceive(DWORD dwBufLen,DWORD &dwFlags,DWORD dwID,DWORD *dwIdentify)
+	{
+		return Receive(dwBufLen,dwFlags,dwIdentify,dwID,dwIdentify,m_socket);
+	}
+	DWORD ClientDisconnect(DWORD dwFlags,DWORD dwID,DWORD *dwIdentify)
+	{
+		return Disconnect(dwFlags,dwID,dwIdentify,m_socket);
+	}
+	DWORD ClientIsConnect(long lOvertime)
+	{
+		return IsConnect(lOvertime,m_socket);
+	}
+	DWORD ClientPeekInputQueue(char* const pBuf,DWORD dwBufLen,DWORD &dwRecvLen,long lOvertime)
+	{
+		return PeekInputQueue(pBuf,dwBufLen,dwRecvLen,lOvertime,m_socket);
+	}
+	DWORD Send(char* pBuf,DWORD dwBufLen,DWORD dwPos,DWORD dwFlags,DWORD dwID,DWORD *dwIdentify,SOCKET s);
+	DWORD Receive(DWORD dwBufLen,DWORD &dwFlags,DWORD dwID,DWORD *dwIdentify,SOCKET s);
+	DWORD Disconnect(DWORD dwFlags,DWORD dwID,DWORD *dwIdentify,SOCKET s);
+	DWORD IsConnect(long lOvertime,SOCKET s);
+	DWORD PeekInputQueue(char* const pBuf,DWORD dwBufLen,DWORD &dwRecvLen,long lOvertime,SOCKET s);
+	SOCKET indexSock(int i);
 
 	DWORD	ReceiveFrom(DWORD dwID,DWORD dwLength,DWORD &dwFlags,const char* szAddress,int nPort,DWORD *dwIdentify);
 	DWORD	ReceiveFrom(DWORD dwID,DWORD dwLength,DWORD &dwFlags,SOCKADDR *lpFrom,int &nFromLen,DWORD *dwIdentify);
@@ -195,7 +212,6 @@ public:
 	DWORD	SendTo(DWORD dwID,char *pBuffer,DWORD dwLength,DWORD dwPos,DWORD dwFlags,
 				   const char* lpAddress,int nPort,short nAf);
 
-	DWORD	Disconnect(DWORD dwID,DWORD dwFlags,DWORD Reserved,DWORD *dwIdentify);
 	DWORD	CloseRemote(DWORD dwID,DWORD idx,DWORD dwFlags,DWORD Reserved,DWORD *dwIdentify);
 
 	DWORD	WaitSocketComplete(DWORD &dwID,UINT &nOperateType,PVOID *lpOptVal,DWORD dwMilliseconds);
@@ -225,11 +241,11 @@ public:
 
 	DWORD	ReleaseAll(void);
 protected:
-	DWORD	Associate(HANDLE hIocp,SOCKET nSock);
-	DWORD	OnFailedFreeMemory(PVOID lpData,UINT nOperateType);
-	void pushSock(SOCKET s);
-	void popSock(SOCKET s);
-	SOCKET indexSock(int i);
+	DWORD Associate(HANDLE hIocp,SOCKET nSock);
+	DWORD OnFailedFreeMemory(PVOID lpData,UINT nOperateType);
+	void  closeAllSock();
+	void  pushSock(SOCKET s);
+	void  popSock(SOCKET s);
 protected:
 	virtual DWORD OnAcceptEx(HANDLE hHeap,PACCEPTEX pAcceptEx,PACCEPTEXINFO *lpInfo,DWORD dwNumOfBytesTransfer);
 	virtual DWORD OnConnectEx(HANDLE hHeap,PCONNECTEX pConnectEx,DWORD dwNumOfBytesTransfer);

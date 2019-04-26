@@ -2,7 +2,8 @@
 
 #include <map>
 #include <sstream>
-
+#include <string>
+#include <vector>
 //#define CURL_STATICLIB
 #include "curl/curl.h"
 #pragma comment(lib,"Wldap32.lib")
