@@ -253,6 +253,19 @@ namespace curl {
 	{
 		m_bFollowLocation = b;
 	}
+	void	CHttpClient::AddFile(const CAtlString  &szName,const CAtlString  &szFileName,const CAtlString &szValue)
+	{
+		AddFile((char*)CT2CA(szName,CP_UTF8),(char*)CT2CA(szFileName,CP_UTF8),(char*)CT2CA(szValue));
+	}
+	void	CHttpClient::AddFile(const std::string &szName,const std::string &szFileName,const std::string& szValue)
+	{
+		CURLFORMcode code = CURL_FORMADD_OK;
+		code = curl_formadd(&m_postBoundary, &m_lastBoundary,
+			CURLFORM_COPYNAME, szName.c_str(),
+			CURLFORM_FILE, szValue.c_str(),
+			CURLFORM_FILENAME, szFileName.c_str(),
+			CURLFORM_END);
+	}
 	void	CHttpClient::AddBoundary(const std::string& szName, const std::string& szValue, ParamAttr dwParamAttr)
 	{
 		CURLFORMcode code = CURL_FORMADD_OK;
@@ -411,7 +424,8 @@ namespace curl {
 
 		if (m_Save2File)
 		{
-			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);
+			//下载文件时也要设置timeout，否则会一直阻塞
+			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 1000);//curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);
 
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSaveFile);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
@@ -470,7 +484,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestGet(const CAtlString& url,bool cHeader,bool cParam,bool perform)
 	{
-		return RequestGet((char*)CT2CA(url),cHeader,cParam,perform);
+		return RequestGet((char*)CT2CA(url),perform);
 	}
 	std::string CHttpClient::RequestGet(const std::string& url,bool cHeader,bool cParam,bool perform)
 	{
@@ -515,6 +529,7 @@ namespace curl {
 	}
 	std::string CHttpClient::RequestPost(const std::string& url,bool cHeader,bool cParam,bool perform) 
 	{
+		
 		m_rqUrl = url;
 		pfmCode = CURL_LAST;
 		if (m_url)

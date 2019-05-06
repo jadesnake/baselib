@@ -2,12 +2,12 @@
 
 #include <map>
 #include <sstream>
-#include <string>
-#include <vector>
+
 //#define CURL_STATICLIB
 #include "curl/curl.h"
 #pragma comment(lib,"Wldap32.lib")
 #pragma comment(lib,"Ws2_32.lib")
+
 
 namespace curl
 {
@@ -61,6 +61,9 @@ namespace curl
 		//添加参数
 		void	AddBoundary(const CAtlString &szName,const CAtlString &szValue,ParamAttr dwParamAttr=ParamNormal);
 		void	AddBoundary(const std::string& ,const std::string& szValue, ParamAttr dwParamAttr=ParamNormal);
+
+		void	AddFile(const CAtlString  &szName,const CAtlString  &szFileName,const CAtlString &szValue);
+		void	AddFile(const std::string &szName,const std::string &szFileName,const std::string& szValue);
 		//清除参数
 		void	ClearBoundary();
 		//自定义协议头
