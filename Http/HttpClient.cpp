@@ -452,9 +452,15 @@ namespace curl {
 		{
 			curl_easy_setopt(m_url, CURLOPT_PROXYTYPE, m_tgProxy.nType);
 			curl_easy_setopt(m_url, CURLOPT_PROXYPORT, m_tgProxy.nPort);
-			//curl_easy_setopt(m_url, CURLOPT_PROXY_SERVICE_NAME, (char*)CT2CA(m_tgProxy.strServer));
-			curl_easy_setopt(m_url, CURLOPT_PROXYUSERNAME, (char*)CT2CA(m_tgProxy.strName));
-			curl_easy_setopt(m_url, CURLOPT_PROXYUSERPWD, (char*)CT2CA(m_tgProxy.strPass));
+			if( std::string::npos!=url.find("https") )
+					curl_easy_setopt(m_url, CURLOPT_HTTPPROXYTUNNEL, 1L);
+			curl_easy_setopt(m_url, CURLOPT_PROXYPORT, m_tgProxy.nPort);
+			curl_easy_setopt(m_url, CURLOPT_PROXY, (char*)CT2CA(m_tgProxy.strServer));
+			std::string up;
+			up += (char*)CT2CA(m_tgProxy.strName);
+			up += ":";
+			up += (char*)CT2CA(m_tgProxy.strPass);
+			curl_easy_setopt(m_url, CURLOPT_PROXYUSERPWD, up.c_str());
 		}
 		if (m_bWriteHeader) {
 			curl_easy_setopt(m_url, CURLOPT_HEADERDATA, (void*)this);
