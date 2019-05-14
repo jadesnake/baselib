@@ -75,7 +75,7 @@ namespace curl
 		CURL*	GetCURL();
 		//设置代理信息
 		void	SetProxy(const Proxy &tgProxy);
-		//超时单位毫秒
+		//超时单位秒
 		void	SetTimeout(long out);
 		//提交的cotent
 		void	SetContent(const std::string& data);

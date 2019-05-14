@@ -162,7 +162,7 @@ namespace curl {
 		,m_bFollowLocation(true)
 	{
 		bHttps = false;
-		m_tmOut = 10000;
+		m_tmOut = 30;
 		m_tgProxy.nType = Proxy::NONE;
 		m_url   = curl_easy_init();
 	}
@@ -424,15 +424,15 @@ namespace curl {
 
 		if (m_Save2File)
 		{
-			//下载文件时也要设置timeout，否则会一直阻塞
-			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 1000);//curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);
+			//curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);
+			curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, m_tmOut);
 
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSaveFile);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
 		}
 		else
 		{
-			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut / 100);	//超时单位秒
+			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut);		//超时单位秒
 
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSave);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
