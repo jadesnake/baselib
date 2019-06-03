@@ -513,7 +513,9 @@ bool KillProcess(const CAtlString& szProcessName)
 	bool bRet = false;
 	bool cmpFullDir = false;
 	if(szProcessName.Find(_T(":\\")))
-		cmpFullDir=true;	//按全路径比较	
+		cmpFullDir=true;	//按全路径比较
+	if(szProcessName.IsEmpty())
+		return false;
 	PROCESSENTRY32 processEntry32;   
 	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
 	if(((int)toolHelp32Snapshot) != -1)  
