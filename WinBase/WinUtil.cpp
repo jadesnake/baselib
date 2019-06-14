@@ -512,7 +512,7 @@ bool KillProcess(const CAtlString& szProcessName)
 {
 	bool bRet = false;
 	bool cmpFullDir = false;
-	if(szProcessName.Find(_T(":\\")))
+	if(-1!=szProcessName.Find(_T(":\\")))
 		cmpFullDir=true;	//按全路径比较
 	if(szProcessName.IsEmpty())
 		return false;
