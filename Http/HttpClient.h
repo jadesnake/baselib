@@ -27,6 +27,23 @@ namespace curl
 		virtual void OnProgress(__int64 total,__int64 rcvSize) = 0;
 		virtual void OnComplete(bool bSuc,const char* msg) = 0;
 	};
+	class  Chunk
+	{
+	public:
+		Chunk();
+		bool IsSizeEnd();
+		bool IsDataEnd();
+		void clear();
+		void write(char *p,long szmem);
+		std::string inSize;
+		long offset;
+		std::stringstream data;
+	private:
+		bool bSizeEnd;
+		bool bDataEnd;
+		long savebyte;
+		long databyte;
+ 	};
 	class CHttpClient
 	{
 	public:
@@ -85,6 +102,7 @@ namespace curl
 		void	BodySaveFile(FILE *f);
 		void	SetCookie(const std::string &val);
 		const std::string& GetCookie();
+		std::string GetContentType();
 		//
 		std::string	RequestPost(const CAtlString& url,bool cHeader=true,bool cParam=true,bool perform=true);
 		std::string RequestPost(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
@@ -156,5 +174,8 @@ namespace curl
 		bool		m_bWriteHeader;
 		bool		m_bDecodeBody;
 		std::string m_cookie;
+		std::string m_contentType;
+		bool		m_chunked;
+		Chunk m_nowChunk;
 	};
 }

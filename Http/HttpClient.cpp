@@ -81,6 +81,86 @@ namespace curl {
 		CHttpClient *client = static_cast<CHttpClient*>(userdata);
 		return client->InsideProc((char*)ptr,size,nmemb,proc);
 	}
+	Chunk::Chunk()
+		:data(std::stringstream::in|std::stringstream::out|std::stringstream::binary)
+	{
+		databyte = 0;
+		savebyte = 0;
+		bDataEnd = false;
+		bSizeEnd = false;
+		offset = 0;
+		databyte = 0;
+ 	}
+	bool Chunk::IsSizeEnd()
+	{
+		return bSizeEnd;
+	}
+	bool Chunk::IsDataEnd()
+	{
+		return bDataEnd;
+	}
+	void Chunk::clear()
+	{
+		databyte = 0;
+		savebyte = 0;
+		bDataEnd = false;
+		bSizeEnd = false;
+		offset = 0;
+		inSize.clear();
+		data.str("");
+		data.clear();
+		data.seekp(0);
+		data.seekg(0);	 
+	}
+	void Chunk::write(char *p,long szmem)
+	{
+		offset = 0;
+		if(!bSizeEnd)
+		{
+			for(long nI=0;nI<szmem;)
+			{
+				inSize += *(p+nI);
+				nI += 1;
+				size_t szlen = inSize.size();
+				char chN = inSize[szlen-1];
+				if((szlen-1)==0)
+					continue;
+				char chR = inSize[szlen-2];
+				if(chN=='\n'&&chR=='\r')
+				{
+					bSizeEnd = true;
+					offset = nI;
+					//移除末尾两个字符
+					inSize.erase(inSize.size()-1);
+					inSize.erase(inSize.size()-1);
+					sscanf(inSize.c_str(),"%x",&databyte);
+					break;
+				}
+			}
+		}
+		if(bSizeEnd)
+		{
+			if(databyte==0)
+			{
+				bDataEnd = true;
+ 				return ;
+			}
+			long syBytes = szmem-offset;
+			long wantsave= databyte-savebyte;
+			if((syBytes-wantsave)<0)
+			{
+				savebyte += syBytes;
+				data.write(p+offset,syBytes);
+				offset = 0;
+				return ;
+			}
+			savebyte += wantsave;
+			data.write(p+offset,wantsave);
+			offset = wantsave+2; //跳过结束标记
+			bDataEnd = true;
+		}		
+		return ;
+	}
 	size_t CHttpClient::InsideProgress(__int64 dltotal,__int64 dlnow,__int64 ultotal, __int64 ulnow)
 	{
 		if(m_notify)
@@ -104,11 +184,14 @@ namespace curl {
 			m_headbuf.flush();
 			return m_headbuf.tellp();
 		}
-		//处理头部信息
-		//if(m_rpHeaders.size()==0)
-		//{
-		//	HandleHeader();
-		//}
+		if((proc==SaveStream||proc==SaveFile)&&size&&m_contentType.empty())
+		{
+			HandleHeader();
+			m_contentType = GetRpHeader("content-type");
+			m_chunked = IsResponseChunk();
+			//转小写
+			std::transform(m_contentType.begin(), m_contentType.end(), m_contentType.begin(), ::tolower);
+		}
 		if(proc==SaveStream&&size)
 		{
 			m_wbuf.write(ptr,size*nmemb);
@@ -117,6 +200,29 @@ namespace curl {
 		}
 		if(proc==SaveFile&&size&&m_Save2File)
 		{
+			//app/json数据
+			if(-1!=m_contentType.find("application/json"))
+			{
+				m_wbuf.write(ptr,size*nmemb);
+				m_wbuf.flush();
+			}
+			if(m_chunked)
+			{
+				m_nowChunk.write(ptr,size*nmemb);
+				if(m_nowChunk.IsSizeEnd()&&m_nowChunk.inSize=="0")
+				{
+					return (size*nmemb);
+				}
+				if(m_nowChunk.IsDataEnd())
+				{
+ 					size_t tp = m_nowChunk.data.tellp();
+					long offset = m_nowChunk.offset;
+					fwrite(m_nowChunk.data.str().c_str(),1, tp, m_Save2File);
+					m_nowChunk.clear();
+					m_nowChunk.write(ptr+offset,size*nmemb-offset);
+				}
+				return (size*nmemb);
+			}
 			return fwrite(ptr, size, nmemb, m_Save2File);
 		}
 		if(proc==Upload&&size)
@@ -165,6 +271,7 @@ namespace curl {
 		m_tmOut = 30;
 		m_tgProxy.nType = Proxy::NONE;
 		m_url   = curl_easy_init();
+		m_chunked = false;
 	}
 	void CHttpClient::SetNotify(CNotify *notify)
 	{
@@ -793,6 +900,10 @@ namespace curl {
 				m_cookie = cookie;
 			}
 		}
+	}
+	std::string CHttpClient::GetContentType()
+	{
+		return m_contentType;
 	}
 	std::string CHttpClient::encodeParam() 
 	{
