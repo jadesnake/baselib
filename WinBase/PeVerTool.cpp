@@ -1,6 +1,7 @@
 #include "StdAfx.h"
 #include "MacroX.h"
 #include "PeVerTool.h"
+#include <sstream>
 #pragma comment(linker, "/defaultlib:version.lib")
 namespace base{
 
@@ -174,6 +175,70 @@ PeInfoVal GetPeInfo(PCTSTR pcszFileName)
 	ret.Set(pBuffer);
 	free(pBuffer);
 	return ret;	
+}
+
+CAtlString GetSelfVersion(HMODULE hModule)
+{
+	HRSRC hsrc = FindResource(hModule, MAKEINTRESOURCE(VS_VERSION_INFO), RT_VERSION);
+	HGLOBAL hgbl = LoadResource(hModule, hsrc);
+	BYTE *pBt=(BYTE *)LockResource(hgbl);
+	VS_FIXEDFILEINFO* pFinfo = (VS_FIXEDFILEINFO*)(pBt+40); 
+	CAtlString valStr;   
+	valStr.Format(L"%d.%d.%d.%d",
+		(pFinfo->dwFileVersionMS >> 16) & 0xFF,
+		(pFinfo->dwFileVersionMS) & 0xFF,
+		(pFinfo->dwFileVersionLS >> 16) & 0xFF,
+		(pFinfo->dwFileVersionLS) & 0xFF );
+	UnlockResource(hgbl);
+	return valStr;
+}
+
+int CompareVersion(LPCTSTR a,LPCTSTR b)
+{
+	std::vector<long> verA;
+	std::vector<long> verB;
+	std::stringstream ssA;
+	std::stringstream ssB;
+	long nTmp=0;
+	for(int n=0;;n++){
+		char ch = a[n];
+		nTmp = 0;
+		if('0'<=ch && ch<='9' && ch!=' ' )
+			ssA << ch;
+		else if(!ssA.str().empty())
+		{
+			ssA>>nTmp;
+			verA.push_back(nTmp);
+			ssA.clear();
+			ssA.str("");
+			if(!ch) break;
+		}
+	}
+	for(int n=0;;n++){
+		char ch = b[n];
+		nTmp = 0;
+		if('0'<=ch && ch<='9' && ch!=' ' )
+			ssB << ch;
+		else if(!ssB.str().empty())
+		{
+			ssB>>nTmp;
+			verB.push_back(nTmp);
+			ssB.clear();
+			ssB.str("");
+			if(!ch) break;
+		}
+	}
+	size_t posA = verA.size();
+	size_t posB = verB.size();
+	if(posA==0&&posB==0) return -1;
+	for(int i=0;i<posA;i++)
+	{
+		if(verA[i]>verB[i])
+			return 1;
+		else if(verA[i]<verB[i])
+			return 2;
+	}
+	return 0;
 }
 
 }

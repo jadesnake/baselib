@@ -47,4 +47,6 @@ namespace base{
 		VS_FIXEDFILEINFO fixed_file_info_;
 	};
 	PeInfoVal GetPeInfo(PCTSTR pcszFileName);
+	CAtlString GetSelfVersion(HMODULE hModule=NULL);
+	int CompareVersion(LPCTSTR a,LPCTSTR b);
 }
