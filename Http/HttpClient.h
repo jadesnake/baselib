@@ -2,12 +2,11 @@
 
 #include <map>
 #include <sstream>
-
+#include <vector>
 //#define CURL_STATICLIB
 #include "curl/curl.h"
 #pragma comment(lib,"Wldap32.lib")
 #pragma comment(lib,"Ws2_32.lib")
-
 
 namespace curl
 {
@@ -17,15 +16,7 @@ namespace curl
 		virtual ~CDebug(){	}
 		virtual void OnCurlDbgRelease() = 0;
 		virtual void OnCurlDbgTrace(const std::stringstream& ss) = 0;
-	};
-	class CNotify
-	{
-	public:
-		virtual ~CNotify(){	}
-		virtual void OnCurlNotifyRelease() = 0;
-		//总长度，接受的数据长度
-		virtual void OnProgress(__int64 total,__int64 rcvSize) = 0;
-		virtual void OnComplete(bool bSuc,const char* msg) = 0;
+		virtual void OnCurlDone(std::stringstream &rp,const char* param,const char* url,int code){ }
 	};
 	class  Chunk
 	{
@@ -52,7 +43,7 @@ namespace curl
 			typedef enum
 			{
 				HTTP = 0,		/* added in 7.10, new in 7.19.4 default is to use CONNECT HTTP/1.1 */
-				SOCKS5 = 5,	/* added in 7.10 */
+				SOCKS5   = 5,	/* added in 7.10 */
 				NONE
 			}TYPE;
 			CAtlString strName;
@@ -74,9 +65,6 @@ namespace curl
 		//添加参数
 		void	AddBoundary(const CAtlString &szName,const CAtlString &szValue,ParamAttr dwParamAttr=ParamNormal);
 		void	AddBoundary(const std::string& ,const std::string& szValue, ParamAttr dwParamAttr=ParamNormal);
-
-		void	AddFile(const CAtlString  &szName,const CAtlString  &szFileName,const CAtlString &szValue);
-		void	AddFile(const std::string &szName,const std::string &szFileName,const std::string& szValue);
 		//清除参数
 		void	ClearBoundary();
 		//自定义协议头
@@ -92,7 +80,7 @@ namespace curl
 		CURL*	GetCURL();
 		//设置代理信息
 		void	SetProxy(const Proxy &tgProxy);
-		//超时单位秒
+		//超时单位毫秒
 		void	SetTimeout(long out);
 		//提交的cotent
 		void	SetContent(const std::string& data);
@@ -102,7 +90,6 @@ namespace curl
 		void	BodySaveFile(FILE *f);
 		void	SetCookie(const std::string &val);
 		const std::string& GetCookie();
-		std::string GetContentType();
 		//
 		std::string	RequestPost(const CAtlString& url,bool cHeader=true,bool cParam=true,bool perform=true);
 		std::string RequestPost(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
@@ -111,7 +98,7 @@ namespace curl
 		std::string RequestGet(const std::string& url,bool cHeader=true,bool cParam=true,bool perform=true);
 		void EnableFollowLocation(bool b);
 		bool IsResponseChunk();
-
+		std::string GetContentType();
 		std::string GetStream();
 		std::string GetRpHeader(const char* key);
 
@@ -127,7 +114,6 @@ namespace curl
 		void		SetEncodeUrl(bool e);
 		long		ReqeustCode();
 		void		ClearAll();
-		void		SetNotify(CNotify *notify);
 		void		SetDebug(CDebug *dbg);
 		CDebug*		GetDebug();
 		void HandleCookie();
@@ -138,12 +124,9 @@ namespace curl
 			SaveStream,
 			Upload,
 			SaveHeader,
-			Progress,
 		};
 		size_t InsideProc(char *ptr, size_t size, size_t nmemb,Proc proc);
-		size_t InsideProgress(__int64 dltotal,__int64 dlnow,__int64 ultotal, __int64 ulnow);
 		std::string m_rqUrl;
-		FILE		*m_Save2File;
 	protected:
 		std::string encodeParam();
 	protected:
@@ -163,7 +146,6 @@ namespace curl
 		std::stringstream	m_headbuf;
 
 		CDebug *m_dbg;
-		CNotify	*m_notify;
 		bool bHttps;
 		CURLcode pfmCode;	//performcode
 	private:
@@ -172,10 +154,39 @@ namespace curl
 		struct curl_httppost *m_postBoundary;
 		struct curl_httppost *m_lastBoundary;
 		bool		m_bWriteHeader;
+		FILE		*m_Save2File;
 		bool		m_bDecodeBody;
 		std::string m_cookie;
 		std::string m_contentType;
 		bool		m_chunked;
 		Chunk m_nowChunk;
-	};
+ 	};
 }
+
+//PeVerTool
+template<class PeVerTool>
+class HttpClientV : public curl::CHttpClient
+{
+public:
+	HttpClientV()
+	{
+		//读取版本号原始文件名等信息
+		HRSRC hsrc = FindResource(0, MAKEINTRESOURCE(VS_VERSION_INFO), RT_VERSION);
+		if(hsrc)
+		{
+			HGLOBAL hgbl = LoadResource(0,hsrc);
+			PeVerTool peTool;
+			peTool.Set(LockResource(hgbl));
+			CAtlString version = peTool.product_version();
+			CAtlString orgName = peTool.original_filename();
+			UnlockResource(hgbl);
+			orgName.Replace(L".exe",L"");
+			version.Remove(' ');
+			version.Replace(',','.');
+			CAtlString strAgent;
+			strAgent.Format(_T("%s:%s"),orgName.GetString(),version.GetString());
+			SetAgent(strAgent);
+			AddHeader(orgName,version);
+		}
+	}
+};

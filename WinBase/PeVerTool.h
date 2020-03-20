@@ -49,4 +49,6 @@ namespace base{
 	PeInfoVal GetPeInfo(PCTSTR pcszFileName);
 	CAtlString GetSelfVersion(HMODULE hModule=NULL);
 	int CompareVersion(LPCTSTR a,LPCTSTR b);
+	//获取两个版本号差值
+	int GetVerDiff(LPCTSTR a,LPCTSTR b);
 }

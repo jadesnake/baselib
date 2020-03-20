@@ -192,7 +192,30 @@ CAtlString GetSelfVersion(HMODULE hModule)
 	UnlockResource(hgbl);
 	return valStr;
 }
-
+int GetVerDiff(LPCTSTR a,LPCTSTR b)
+{
+	std::stringstream ssA;
+	std::stringstream ssB;
+	long nTmp=0;
+	for(int n=0;;n++){
+		char ch = a[n];
+		nTmp = 0;
+		if('0'<=ch && ch<='9' && ch!=' ' )
+			ssA << ch;
+		if(ch=='\0') break;
+	}
+	for(int n=0;;n++){
+		char ch = b[n];
+		nTmp = 0;
+		if('0'<=ch && ch<='9' && ch!=' ' )
+			ssB << ch;
+		if(ch=='\0') break;
+	}
+	long nA = 0,nB = 0;
+	ssA >> nA;
+	ssB >> nB;
+	return (nA - nB);
+}
 int CompareVersion(LPCTSTR a,LPCTSTR b)
 {
 	std::vector<long> verA;

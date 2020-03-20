@@ -8,26 +8,25 @@ namespace curl {
 		switch (type) {
 		case CURLINFO_TEXT:
 			buf << data;
-			break;
 		default: /* in case a new one is introduced to shock us */
 			return 0;
 		case CURLINFO_HEADER_OUT:
-			buf <<std::endl<<"header=> ";
+			buf <<std::endl<<"=> Send header";
 			break;
 		case CURLINFO_DATA_OUT:
-			buf <<std::endl<< "data=> ";
+			buf <<std::endl<< "=> Send data";
 			break;
 		case CURLINFO_SSL_DATA_OUT:
-			buf <<std::endl<< "SSL data=> ";
+			buf <<std::endl<< "=> Send SSL data";
 			break;
 		case CURLINFO_HEADER_IN:
-			buf <<std::endl<< "header<= ";
+			buf <<std::endl<< "<= Recv header";
 			break;
 		case CURLINFO_DATA_IN:
-			buf <<std::endl<< "data<= ";
+			buf <<std::endl<< "<= Recv data";
 			break;
 		case CURLINFO_SSL_DATA_IN:
-			buf <<std::endl<< "SSL data<= ";
+			buf <<std::endl<< "<= Recv SSL data";
 			break;
 		}
 		buf.write((char *)data, size);
@@ -37,7 +36,6 @@ namespace curl {
 		CDebug *dbg = static_cast<CDebug*>(userp);	
 		if(dbg)
 			dbg->OnCurlDbgTrace(buf);
-
 		return 0;
 	}
 	int StreamSeek(void *userp, curl_off_t offset, int origin) 
@@ -54,12 +52,6 @@ namespace curl {
 		CHttpClient *client = static_cast<CHttpClient*>(userdata);
 		client->InsideProc((char*)ptr,size,nmemb,proc);
 		return (size*nmemb);
-	}
-	int StreamProgress(void *clientp,curl_off_t dltotal,curl_off_t dlnow,curl_off_t ultotal,curl_off_t ulnow)
-	{
-		CHttpClient *client = static_cast<CHttpClient*>(clientp);
-		client->InsideProgress(dltotal,dlnow,ultotal,ulnow);
-		return 0;
 	}
 	size_t StreamSave(char *ptr, size_t size, size_t nmemb, void *userdata)
 	{
@@ -81,6 +73,38 @@ namespace curl {
 		CHttpClient *client = static_cast<CHttpClient*>(userdata);
 		return client->InsideProc((char*)ptr,size,nmemb,proc);
 	}
+	//有些服务chuck长度和实际数据不一致
+	void readChuckFromStream(std::stringstream &ss,std::string &out,long nlen)
+	{
+		if(nlen==0)	return ;
+		long nowPos = ss.tellg();
+		char *buf = new char[nlen];
+		ss.read(buf,nlen);
+		nowPos = ss.tellg() - nowPos;
+		out.clear();
+		out.append(buf,nowPos);
+		delete []buf;
+	}
+	//有些服务chuck长度和实际数据不一致
+	void readChuckFromStream(std::stringstream &ss,std::string &out)
+	{
+		char crlf[2]={0,0};
+		char chTmp=0;
+		std::string chuck;
+		while(ss.read(&chTmp,1))
+		{
+			if(chTmp=='\r' && ss.peek()=='\n')
+			{
+				//跳过末尾
+				ss.seekg(1,std::ios::cur);
+				break ;
+			}
+			chuck += chTmp;
+		}
+		out = chuck;
+		return ;
+	}
+
 	Chunk::Chunk()
 		:data(std::stringstream::in|std::stringstream::out|std::stringstream::binary)
 	{
@@ -160,21 +184,6 @@ namespace curl {
 			bDataEnd = true;
 		}		
 		return ;
-	}
-	size_t CHttpClient::InsideProgress(__int64 dltotal,__int64 dlnow,__int64 ultotal, __int64 ulnow)
-	{
-		if(m_notify)
-		{
-			if(m_rbuf.str().size() && ulnow)
-			{
-				m_notify->OnProgress(ultotal,ulnow);
-			}
-			else if( dlnow )
-			{
-				m_notify->OnProgress(dltotal,dlnow);
-			}
-		}
-		return 1;
 	}
 	size_t CHttpClient::InsideProc(char *ptr, size_t size, size_t nmemb,Proc proc)
 	{
@@ -264,7 +273,6 @@ namespace curl {
 		,m_bDecodeBody(false)
 		,m_bEncodeUrl(true)
 		,m_dbg(NULL)
-		,m_notify(NULL)
 		,m_bFollowLocation(true)
 	{
 		bHttps = false;
@@ -272,12 +280,6 @@ namespace curl {
 		m_tgProxy.nType = Proxy::NONE;
 		m_url   = curl_easy_init();
 		m_chunked = false;
-	}
-	void CHttpClient::SetNotify(CNotify *notify)
-	{
-		if(m_notify)
-			return ;
-		m_notify = notify;
 	}
 	void CHttpClient::SetDebug(CDebug *dbg)
 	{
@@ -304,11 +306,6 @@ namespace curl {
 		{
 			m_dbg->OnCurlDbgRelease();
 			m_dbg = NULL;
-		}
-		if(m_notify)
-		{
-			m_notify->OnCurlNotifyRelease();
-			m_notify = NULL;
 		}
 	}
 	void	CHttpClient::ClearAll()
@@ -360,19 +357,6 @@ namespace curl {
 	{
 		m_bFollowLocation = b;
 	}
-	void	CHttpClient::AddFile(const CAtlString  &szName,const CAtlString  &szFileName,const CAtlString &szValue)
-	{
-		AddFile((char*)CT2CA(szName,CP_UTF8),(char*)CT2CA(szFileName,CP_UTF8),(char*)CT2CA(szValue));
-	}
-	void	CHttpClient::AddFile(const std::string &szName,const std::string &szFileName,const std::string& szValue)
-	{
-		CURLFORMcode code = CURL_FORMADD_OK;
-		code = curl_formadd(&m_postBoundary, &m_lastBoundary,
-			CURLFORM_COPYNAME, szName.c_str(),
-			CURLFORM_FILE, szValue.c_str(),
-			CURLFORM_FILENAME, szFileName.c_str(),
-			CURLFORM_END);
-	}
 	void	CHttpClient::AddBoundary(const std::string& szName, const std::string& szValue, ParamAttr dwParamAttr)
 	{
 		CURLFORMcode code = CURL_FORMADD_OK;
@@ -413,7 +397,7 @@ namespace curl {
 		{
 			std::string file;
 			std::string name = (char*)CT2CA(szName, CP_UTF8);
-			file = (char*)CT2CA(szValue);
+			file = (char*)CT2CA(szValue, CP_UTF8);
 			curl_formadd(&m_postBoundary, &m_lastBoundary,
 				CURLFORM_COPYNAME, name.c_str(),
 				CURLFORM_FILE, file.c_str(),
@@ -421,7 +405,7 @@ namespace curl {
 				CURLFORM_END);
 		}
 		else if (dwParamAttr == ParamFileData) {
-			std::string val = (char*)CT2CA(szValue);
+			std::string val = (char*)CT2CA(szValue, CP_UTF8);
 			std::string name = (char*)CT2CA(szName, CP_UTF8);
 			curl_formadd(&m_postBoundary, &m_lastBoundary,
 				CURLFORM_COPYNAME, "file",
@@ -455,6 +439,7 @@ namespace curl {
 	}
 	void	CHttpClient::PerformParam(const std::string& url)
 	{
+		m_chunked = false;
 		curl_easy_reset(m_url);
 		m_wbuf.clear();	//清除操作标记，如 输入输出流指针
 		m_wbuf.str("");
@@ -496,12 +481,15 @@ namespace curl {
 		{
 			bHttps = false;
 		}
-		curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, 10);		//链接超时
+		curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, 30);		//链接超时
 		if (m_headerlist)
 			curl_easy_setopt(m_url, CURLOPT_HTTPHEADER, m_headerlist);
 		if(!m_agent.IsEmpty())
 			curl_easy_setopt(m_url, CURLOPT_USERAGENT, (char*)CT2CA(m_agent, CP_UTF8));
 		
+		curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut);
+		//curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);	//永不超时
+
 		if(m_bFollowLocation)
 			curl_easy_setopt(m_url, CURLOPT_FOLLOWLOCATION, 1L);
 		else
@@ -531,25 +519,15 @@ namespace curl {
 
 		if (m_Save2File)
 		{
-			//curl_easy_setopt(m_url, CURLOPT_TIMEOUT, 0);
-			curl_easy_setopt(m_url, CURLOPT_CONNECTTIMEOUT, m_tmOut);
-
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSaveFile);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
 		}
 		else
 		{
-			curl_easy_setopt(m_url, CURLOPT_TIMEOUT, m_tmOut);		//超时单位秒
-
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSave);
 			curl_easy_setopt(m_url, CURLOPT_WRITEDATA, (void*)this);
 		}
-		if (m_notify)
-		{
-			curl_easy_setopt(m_url,CURLOPT_XFERINFODATA,(void*)this);
-			curl_easy_setopt(m_url,CURLOPT_XFERINFOFUNCTION,StreamProgress);
-			curl_easy_setopt(m_url,CURLOPT_NOPROGRESS, 0L);
-		}
+
 		if (m_rbuf.tellp()) {
 			curl_off_t nLen = (curl_off_t)m_rbuf.tellp();
 			curl_easy_setopt(m_url, CURLOPT_READFUNCTION, StreamUpdate);
@@ -557,24 +535,35 @@ namespace curl {
 		}
 		if (m_tgProxy.nType != Proxy::NONE)
 		{
-			curl_easy_setopt(m_url, CURLOPT_PROXYTYPE, m_tgProxy.nType);
-			curl_easy_setopt(m_url, CURLOPT_PROXYPORT, m_tgProxy.nPort);
-			if( std::string::npos!=url.find("https") )
+			bool bValidPoxy=false;
+			if(m_tgProxy.nType==Proxy::HTTP)
+			{
+				curl_easy_setopt(m_url, CURLOPT_PROXYTYPE,CURLPROXY_HTTP);
+				bValidPoxy=true;
+			}
+			else if(m_tgProxy.nType==Proxy::SOCKS5)
+			{
+				curl_easy_setopt(m_url, CURLOPT_PROXYTYPE,CURLPROXY_SOCKS5);
+				bValidPoxy=true;
+			}
+			if(bValidPoxy)
+			{
+				if( std::string::npos!=url.find("https") )
 					curl_easy_setopt(m_url, CURLOPT_HTTPPROXYTUNNEL, 1L);
-			curl_easy_setopt(m_url, CURLOPT_PROXYPORT, m_tgProxy.nPort);
-			curl_easy_setopt(m_url, CURLOPT_PROXY, (char*)CT2CA(m_tgProxy.strServer));
-			std::string up;
-			up += (char*)CT2CA(m_tgProxy.strName);
-			up += ":";
-			up += (char*)CT2CA(m_tgProxy.strPass);
-			curl_easy_setopt(m_url, CURLOPT_PROXYUSERPWD, up.c_str());
+				curl_easy_setopt(m_url, CURLOPT_PROXYPORT, m_tgProxy.nPort);
+				curl_easy_setopt(m_url, CURLOPT_PROXY, (char*)CT2CA(m_tgProxy.strServer));
+				std::string up;
+				up += (char*)CT2CA(m_tgProxy.strName);
+				up += ":";
+				up += (char*)CT2CA(m_tgProxy.strPass);
+				curl_easy_setopt(m_url, CURLOPT_PROXYUSERPWD, up.c_str());
+			}	
 		}
 		if (m_bWriteHeader) {
 			curl_easy_setopt(m_url, CURLOPT_HEADERDATA, (void*)this);
 			curl_easy_setopt(m_url, CURLOPT_HEADERFUNCTION, StreamHeader);
 		}
-		//http 采用chunk传输，引起分块可以使用1.0协议避免分块
-		curl_easy_setopt(m_url, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_0);
+		//curl_easy_setopt(m_url, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 		if(m_dbg)
 		{
 			curl_easy_setopt(m_url, CURLOPT_VERBOSE, 1L);
@@ -622,33 +611,23 @@ namespace curl {
 				m_header.clear();
 			m_cookie.clear();
 			if(perform)
-			{
 				pfmCode = curl_easy_perform(m_url);
-				if(m_notify)
-				{
-					if(pfmCode != CURLE_OK)
-						m_notify->OnComplete(false,curl_easy_strerror(pfmCode));
-					else
-						m_notify->OnComplete(true,"success");
-				}
-			}
 		}
 		return GetStream();
 	}
 
 	std::string	CHttpClient::RequestPost(const CAtlString& url,bool cHeader,bool cParam,bool perform)
 	{
-		return RequestPost((char*)CT2CA(url),cHeader,cParam,perform);
+		return RequestPost((char*)CT2CA(url),perform,cHeader,cParam);
 	}
 	std::string CHttpClient::RequestPost(const std::string& url,bool cHeader,bool cParam,bool perform) 
 	{
-		
 		m_rqUrl = url;
 		pfmCode = CURL_LAST;
 		if (m_url)
 		{
 			std::stringstream dbgSS;
-
+			std::string encode = encodeParam();
 			PerformParam(url);
 			curl_easy_setopt(m_url, CURLOPT_POST, 1L);
 			curl_easy_setopt(m_url, CURLOPT_POSTREDIR, CURL_REDIR_POST_ALL);
@@ -677,15 +656,10 @@ namespace curl {
 			if(bHttps && m_dbg)
 				m_dbg->OnCurlDbgTrace(dbgSS);
 			if(perform)
-			{
 				pfmCode = curl_easy_perform(m_url);
-				if(m_notify)
-				{
-					if(pfmCode != CURLE_OK)
-						m_notify->OnComplete(false,curl_easy_strerror(pfmCode));
-					else
-						m_notify->OnComplete(true,"success");
-				}
+			if(m_dbg)
+			{
+				m_dbg->OnCurlDone(m_wbuf,encode.c_str(),url.c_str(),ReqeustCode());
 			}
 		}
 		return GetStream();
@@ -716,37 +690,6 @@ namespace curl {
 		}
 		return chunked;
 	}
-	//有些服务chuck长度和实际数据不一致
-	void readChuckFromStream(std::stringstream &ss,std::string &out,long nlen)
-	{
-		if(nlen==0)	return ;
-		long nowPos = ss.tellg();
-		char *buf = new char[nlen];
-		ss.read(buf,nlen);
-		nowPos = ss.tellg() - nowPos;
-		out.clear();
-		out.append(buf,nowPos);
-		delete []buf;
-	}
-	//有些服务chuck长度和实际数据不一致
-	void readChuckFromStream(std::stringstream &ss,std::string &out)
-	{
-		char crlf[2]={0,0};
-		char chTmp=0;
-		std::string chuck;
-		while(ss.read(&chTmp,1))
-		{
-			if(chTmp=='\r' && ss.peek()=='\n')
-			{
-				//跳过末尾
-				ss.seekg(1,std::ios::cur);
-				break ;
-			}
-			chuck += chTmp;
-		}
-		out = chuck;
-		return ;
-	}
 	std::vector<std::string> CHttpClient::GetChunks()
 	{
 		std::vector<std::string>  ret;
@@ -755,6 +698,8 @@ namespace curl {
 			ret.push_back(GetStream());			
 			return ret;
 		}
+		if(pfmCode==CURLE_OPERATION_TIMEDOUT)
+			return ret;
 		bool error = false;
 		long nChuck = -1;
 		std::string line;
@@ -788,11 +733,13 @@ namespace curl {
 	}
 	std::string CHttpClient::MakeChunks()
 	{
+		std::string ret("");
+		if(pfmCode==CURLE_OPERATION_TIMEDOUT)
+			return ret;
 		std::vector<std::string> vtSome;
 		vtSome = GetChunks();
 		if(vtSome.size()==1)
 			return vtSome[0];
-		std::string ret("");
 		for(size_t n=0;n<vtSome.size();n++)
 		{
 			ret += vtSome[n];
@@ -809,6 +756,10 @@ namespace curl {
 			trace.flush();
 			m_dbg->OnCurlDbgTrace(trace);
 		}
+		//超时
+		if(pfmCode==CURLE_OPERATION_TIMEDOUT)
+			return strRet;
+
 		HandleHeader();
 		HandleCookie();
 		if(200!=ReqeustCode())
@@ -875,6 +826,10 @@ namespace curl {
 			m_rpHeaders[key] = line.substr(pos+1);
 		}
 	}
+	std::string CHttpClient::GetContentType()
+	{
+		return m_contentType;
+	}
 	void CHttpClient::HandleCookie()
 	{
 		std::string setCookie = GetRpHeader("set-cookie");
@@ -900,10 +855,6 @@ namespace curl {
 				m_cookie = cookie;
 			}
 		}
-	}
-	std::string CHttpClient::GetContentType()
-	{
-		return m_contentType;
 	}
 	std::string CHttpClient::encodeParam() 
 	{
