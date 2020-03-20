@@ -3,9 +3,26 @@
 
 
 #include <string>
+#include <map>
+#include <sstream>
 
 namespace base
 {
+ typedef struct _CallEnd
+ {
+	CAtlString msg;
+	bool bSuc;
+	_CallEnd(){
+		bSuc = false;
+		msg = L"初始化";
+	}
+ }CallEnd;
+ 
+ CAtlString GetFileHash(LPCTSTR pszFileName);
+
+ CAtlString GetLastMsg();
+
+ CallEnd IsIDE(CAtlString DriveName);
 
  bool IsAddressInCurrentModule(void* address);
 

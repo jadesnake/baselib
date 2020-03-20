@@ -8,10 +8,152 @@
 #include <Strsafe.h>
 #include <tlhelp32.h>
 #include <Psapi.h>
+#include <Winioctl.h>
+#include <WinCrypt.h>
 #pragma comment(lib, "Netapi32.lib")
 #pragma comment(lib, "IPHLPAPI.lib")
-namespace base
+namespace base{
+
+BOOL EnableDebugPrivilge(TCHAR *lpName, BOOL fEnable)
+{  
+	HANDLE hObject;  
+	LUID Luid;  
+	TOKEN_PRIVILEGES NewStatus;  
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &hObject))  
+	{  
+		return FALSE;  
+	}  
+	if (LookupPrivilegeValue(NULL, lpName, &Luid))  
+	{  
+		NewStatus.Privileges[0].Luid = Luid;  
+		NewStatus.PrivilegeCount = 1;  
+		NewStatus.Privileges[0].Attributes = fEnable ? SE_PRIVILEGE_ENABLED : 0;  
+		BOOL b = AdjustTokenPrivileges(hObject, FALSE, &NewStatus, 0, 0, 0);  
+		CloseHandle(hObject);  
+		return b;  
+	}  
+	return FALSE;  
+}
+
+CAtlString GetLastMsg()
 {
+	LPVOID   lpMsgBuf;   
+	FormatMessage(     
+		FORMAT_MESSAGE_ALLOCATE_BUFFER   |     
+		FORMAT_MESSAGE_FROM_SYSTEM   |     
+		FORMAT_MESSAGE_IGNORE_INSERTS,   
+		NULL,   
+		GetLastError(),   
+		MAKELANGID(LANG_NEUTRAL,   SUBLANG_DEFAULT),   //   Default   language   
+		(LPTSTR)&lpMsgBuf,0,NULL); 
+	CAtlString ret((LPCTSTR)lpMsgBuf);
+	LocalFree(lpMsgBuf);
+	return ret;
+}
+
+CAtlString GetFileHash(LPCTSTR pszFileName)
+{
+	long BUFSIZE = 1024;
+	long MD5LEN = 16;
+	BOOL bResult = FALSE;
+	HCRYPTPROV hProv = 0;
+	HCRYPTHASH hHash = 0;
+	HANDLE hFile = NULL;
+	BYTE rgbFile[1024];
+	DWORD cbRead = 0;
+	BYTE rgbHash[16];
+	DWORD cbHash = 0;
+	CHAR rgbDigits[] = "0123456789abcdef";
+	CAtlString strHashCode=_T("");	
+	if(NULL==pszFileName)
+	{
+		return strHashCode;
+	}
+	hFile = CreateFile(pszFileName,
+		GENERIC_READ,
+		FILE_SHARE_READ,
+		NULL,
+		OPEN_EXISTING,
+		FILE_FLAG_SEQUENTIAL_SCAN,
+		NULL);
+	if (INVALID_HANDLE_VALUE == hFile)
+	{
+		return strHashCode;
+	}
+	if (!CryptAcquireContext(&hProv,
+		NULL,
+		NULL,
+		PROV_RSA_FULL,
+		CRYPT_VERIFYCONTEXT))
+	{
+		CloseHandle(hFile);
+
+		return strHashCode;
+	}
+	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
+	{		
+		CloseHandle(hFile);
+		CryptReleaseContext(hProv, 0);
+		return strHashCode;
+	}
+	while (bResult = ReadFile(hFile, rgbFile, BUFSIZE, 
+		&cbRead, NULL))
+	{
+		if (0 == cbRead)
+		{
+			break;
+		}
+		if (!CryptHashData(hHash, rgbFile, cbRead, 0))
+		{
+			CryptReleaseContext(hProv, 0);
+			CryptDestroyHash(hHash);
+			CloseHandle(hFile);
+			return strHashCode;
+		}
+	}
+	if (!bResult)
+	{		
+		CryptReleaseContext(hProv, 0);
+		CryptDestroyHash(hHash);
+		CloseHandle(hFile);
+
+		return strHashCode;
+	}
+	cbHash = MD5LEN;
+	TCHAR szTemp[3];
+	TCHAR szHashcode[33]={0};
+	if (CryptGetHashParam(hHash, HP_HASHVAL, rgbHash, &cbHash, 0))
+	{		
+		for (DWORD i = 0; i < cbHash; i++)
+		{
+			wsprintf(szTemp, _T("%c"), rgbDigits[rgbHash[i] >> 4]);
+			lstrcat(szHashcode, szTemp);
+
+			wsprintf(szTemp, _T("%c"), rgbDigits[rgbHash[i] & 0xf]);
+			lstrcat(szHashcode, szTemp);
+		}	
+		strHashCode=szHashcode;
+	}
+	CryptDestroyHash(hHash);
+	CryptReleaseContext(hProv, 0);
+	CloseHandle(hFile);
+	return strHashCode;
+}
+
+CallEnd IsIDE(CAtlString   DriveName)   
+{   
+	CallEnd callEnd;
+	UINT ideType = ::GetDriveType(DriveName);
+	if(ideType != DRIVE_FIXED)
+	{
+		callEnd.bSuc = false;
+		callEnd.msg  = "非本地分区";
+		return callEnd;
+	}
+	callEnd.bSuc = true;
+	callEnd.msg  = "本地分区";
+	return callEnd;
+}
 
 bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath)
 {
@@ -513,9 +655,7 @@ bool KillProcess(const CAtlString& szProcessName)
 	bool bRet = false;
 	bool cmpFullDir = false;
 	if(-1!=szProcessName.Find(_T(":\\")))
-		cmpFullDir=true;	//按全路径比较
-	if(szProcessName.IsEmpty())
-		return false;
+		cmpFullDir=true;	//按全路径比较	
 	PROCESSENTRY32 processEntry32;   
 	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
 	if(((int)toolHelp32Snapshot) != -1)  
@@ -534,6 +674,7 @@ bool KillProcess(const CAtlString& szProcessName)
 						if(szProcessName==chPath)
 						{
 							::TerminateProcess(handle,0xdead);
+							::WaitForSingleObject(handle,INFINITE);
 							::CloseHandle(handle);
 							bRet = true; 
 							break;
@@ -543,9 +684,10 @@ bool KillProcess(const CAtlString& szProcessName)
 				}
 				else if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
 				{
-					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE,FALSE,processEntry32.th32ProcessID);
+					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
 					if(handle){
 						::TerminateProcess(handle,0xdead);
+						::WaitForSingleObject(handle,INFINITE);
 						::CloseHandle(handle);
 						bRet = true;
 					}
