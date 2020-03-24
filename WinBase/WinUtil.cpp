@@ -51,6 +51,131 @@ CAtlString GetLastMsg()
 	return ret;
 }
 
+bool ControlLocalSC(const LocalSC& sc,bool bWait)
+{
+	SC_HANDLE hSCM = ::OpenSCManager(NULL, NULL, GENERIC_EXECUTE);
+	if(hSCM == NULL)
+		return false;
+	SC_HANDLE hSvc = ::OpenService(hSCM,sc.name,SERVICE_START|SERVICE_QUERY_STATUS|SERVICE_STOP);
+	if( hSvc == NULL)
+	{
+		::CloseServiceHandle(hSCM);
+		return false;
+	}
+	SERVICE_STATUS status;
+	DWORD dwWantState = 0;
+	if(sc.name==L"stop")
+	{ // 停止服务
+		if( ControlService(hSvc,SERVICE_CONTROL_STOP,&status) == FALSE)
+		{
+			CloseServiceHandle(hSvc);
+			CloseServiceHandle(hSCM);
+			return false;
+		}
+		dwWantState = SERVICE_STOPPED;
+	}
+	else if(sc.name==L"run" || sc.name==L"start")
+	{
+		if( StartService( hSvc, NULL, NULL) == FALSE)
+		{
+			CloseServiceHandle( hSvc);
+			CloseServiceHandle( hSCM);
+			return false;
+		}
+		dwWantState = SERVICE_RUNNING;
+	}
+	else
+	{
+		CloseServiceHandle( hSvc);
+		CloseServiceHandle( hSCM);
+		return false;
+	}
+	if(!bWait)
+	{
+		CloseServiceHandle( hSvc);
+		CloseServiceHandle( hSCM);
+		return true;
+	}
+	while( QueryServiceStatus( hSvc, &status) == TRUE)
+	{
+		Sleep(status.dwWaitHint);
+		if(status.dwCurrentState==dwWantState)
+		{
+			CloseServiceHandle( hSvc);
+			CloseServiceHandle( hSCM);
+			return true;
+		}
+	}
+	CloseServiceHandle(hSvc);
+	CloseServiceHandle(hSCM);
+	return true;
+}
+
+size_t GetLocalScNoDriver(MapLocalSC &out)
+{
+	SC_HANDLE hSCM = ::OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE);
+	if(hSCM == NULL)
+		return 0;
+	LPENUM_SERVICE_STATUS pServStatus = NULL;
+	DWORD dwBytesNeeded = 0, dwServCound = 0, dwResume = 0, dwRealBytes = 0;
+	BOOL bRet = ::EnumServicesStatus(hSCM, SERVICE_WIN32, SERVICE_STATE_ALL, NULL, 0, &dwBytesNeeded, &dwServCound, &dwResume);
+	dwRealBytes = dwBytesNeeded;
+	if(dwRealBytes==0)
+	{
+		::CloseServiceHandle(hSCM);
+		return 0;
+	}
+	NOTHROW_NEW(ENUM_SERVICE_STATUS[dwRealBytes+1],pServStatus);
+	if(pServStatus==NULL)
+	{
+		::CloseServiceHandle(hSCM);
+		return 0;
+	}
+	ZeroMemory(pServStatus, dwRealBytes+1);
+	bRet = ::EnumServicesStatus(hSCM, SERVICE_WIN32, SERVICE_STATE_ALL, pServStatus, dwRealBytes, &dwBytesNeeded, &dwServCound, &dwResume);
+	if(!bRet)
+	{
+		::CloseServiceHandle(hSCM);
+		delete []pServStatus;
+		return 0;
+	}
+	out.clear();
+	for(DWORD dwIdx=0;dwIdx<dwServCound;dwIdx++)
+	{
+		LocalSC sc;
+		sc.name = pServStatus[dwIdx].lpDisplayName;
+		sc.curState = pServStatus[dwIdx].ServiceStatus.dwCurrentState;
+		switch(sc.curState)
+		{
+		case SERVICE_STOPPED:
+			sc.state = L"stopped";
+			break;
+		case SERVICE_START_PENDING:
+			sc.state = L"start_pending";
+			break;
+		case SERVICE_STOP_PENDING:
+			sc.state = L"stop_pending";
+			break;
+		case SERVICE_RUNNING:
+			sc.state = L"running";
+			break;
+		case SERVICE_CONTINUE_PENDING:
+			sc.state = L"continue_pending";
+			break;
+		case SERVICE_PAUSE_PENDING:
+			sc.state = L"pause_pending";
+			break;
+		case SERVICE_PAUSED:
+			sc.state = L"paused";
+			break;
+		}
+		out[sc.name] = sc;
+	}
+	::CloseServiceHandle(hSCM);
+	delete []pServStatus;
+	return out.size();
+}
+
 CAtlString GetFileHash(LPCTSTR pszFileName)
 {
 	long BUFSIZE = 1024;
