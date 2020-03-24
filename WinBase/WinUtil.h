@@ -24,7 +24,8 @@ namespace base
 	 CAtlString state;	//服务状态
 	 DWORD curState;
  }LocalSC;
- 
+ typedef std::map<CAtlString,LocalSC> MapLocalSC;
+
  bool ControlLocalSC(const LocalSC& sc,bool bWait);
 
  size_t GetLocalScNoDriver(MapLocalSC &out);
