@@ -147,7 +147,7 @@ DWORD 	EnumFloderItem(LPCTSTR lpRoot,DWORD dwAttributes,
 		hFind	=	FindFirstFile(lpRoot,&tgFindData);
 		if(hFind == INVALID_HANDLE_VALUE)
 			throw (DWORD)GetLastError();
-		memcpy(chFullPath,lpRoot,sizeof(chFullPath));
+		_tcscpy_s(chFullPath,MAX_PATH,lpRoot);
 		PathRemoveFileSpec(chFullPath);
 		do
 		{
@@ -663,4 +663,8 @@ DWORD	CountDirFiles(const CAtlString& dir)
 	::FindClose(hFind);
 	//清空移动过的目录
 	return dwRet;
+}
+bool RenameFile(const CAtlString& src, const CAtlString& dst)
+{
+	return MoveFileEx(src,dst,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH|MOVEFILE_COPY_ALLOWED)?true:false;
 }
