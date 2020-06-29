@@ -668,3 +668,20 @@ bool RenameFile(const CAtlString& src, const CAtlString& dst)
 {
 	return MoveFileEx(src,dst,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH|MOVEFILE_COPY_ALLOWED)?true:false;
 }
+
+CAtlString GetDocPath()
+{
+ 	TCHAR szDocument[MAX_PATH] = { 0 };
+ 	LPITEMIDLIST pidl = NULL;
+	::SHGetSpecialFolderLocation(NULL, CSIDL_COMMON_DOCUMENTS, &pidl);
+	SHGetPathFromIDList(pidl, szDocument);
+	CString ret = szDocument;
+	TCHAR end = ret[ret.GetLength() - 1];
+	if ('\\' != end && end != '/') {
+		ret += '\\';
+	}
+	if (_waccess(CT2CW(ret), 0) == -1) {
+		_wmkdir(CT2CW(ret));
+	}
+	return ret;
+}
