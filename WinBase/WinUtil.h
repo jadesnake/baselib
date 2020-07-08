@@ -3,39 +3,11 @@
 
 
 #include <string>
-#include <map>
-#include <sstream>
 
 namespace base
 {
- typedef struct _CallEnd
- {
-	CAtlString msg;
-	bool bSuc;
-	_CallEnd(){
-		bSuc = false;
-		msg = L"初始化";
-	}
- }CallEnd;
-
- typedef struct _tgLocalSC
- {
-	 CAtlString name;	//服务名称
-	 CAtlString state;	//服务状态
-	 DWORD curState;
- }LocalSC;
- typedef std::map<CAtlString,LocalSC> MapLocalSC;
-
- bool ControlLocalSC(const LocalSC& sc,bool bWait);
-
- size_t GetLocalScNoDriver(MapLocalSC &out);
-
-
- CAtlString GetFileHash(LPCTSTR pszFileName);
-
- CAtlString GetLastMsg();
-
- CallEnd IsIDE(CAtlString DriveName);
+ std::vector<std::string> GetLocalIp();
+ bool CanOpenFile(LPCTSTR file);
 
  bool IsAddressInCurrentModule(void* address);
 
@@ -109,6 +81,9 @@ namespace base
 
  std::string  AllocGuidA();
  std::wstring AllocGuidW();
+
+ CAtlString GetOcxPath(LPCTSTR name);
+ bool SetOcxPath(LPCTSTR name,LPCTSTR path);
 
  #define MAX_TRACEBUF    502
  void  TraceA(LPCSTR pstrFormat, ...);

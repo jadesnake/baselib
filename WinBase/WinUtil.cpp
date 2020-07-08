@@ -8,276 +8,90 @@
 #include <Strsafe.h>
 #include <tlhelp32.h>
 #include <Psapi.h>
-#include <Winioctl.h>
-#include <WinCrypt.h>
 #pragma comment(lib, "Netapi32.lib")
 #pragma comment(lib, "IPHLPAPI.lib")
-namespace base{
 
-BOOL EnableDebugPrivilge(TCHAR *lpName, BOOL fEnable)
-{  
-	HANDLE hObject;  
-	LUID Luid;  
-	TOKEN_PRIVILEGES NewStatus;  
-	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &hObject))  
-	{  
-		return FALSE;  
-	}  
-	if (LookupPrivilegeValue(NULL, lpName, &Luid))  
-	{  
-		NewStatus.Privileges[0].Luid = Luid;  
-		NewStatus.PrivilegeCount = 1;  
-		NewStatus.Privileges[0].Attributes = fEnable ? SE_PRIVILEGE_ENABLED : 0;  
-		BOOL b = AdjustTokenPrivileges(hObject, FALSE, &NewStatus, 0, 0, 0);  
-		CloseHandle(hObject);  
-		return b;  
-	}  
-	return FALSE;  
-}
+namespace base	{
 
-CAtlString GetLastMsg()
+bool SetOcxPath(LPCTSTR name,LPCTSTR path)
 {
-	LPVOID   lpMsgBuf;   
-	FormatMessage(     
-		FORMAT_MESSAGE_ALLOCATE_BUFFER   |     
-		FORMAT_MESSAGE_FROM_SYSTEM   |     
-		FORMAT_MESSAGE_IGNORE_INSERTS,   
-		NULL,   
-		GetLastError(),   
-		MAKELANGID(LANG_NEUTRAL,   SUBLANG_DEFAULT),   //   Default   language   
-		(LPTSTR)&lpMsgBuf,0,NULL); 
-	CAtlString ret((LPCTSTR)lpMsgBuf);
-	LocalFree(lpMsgBuf);
-	return ret;
-}
-
-bool ControlLocalSC(const LocalSC& sc,bool bWait)
-{
-	SC_HANDLE hSCM = ::OpenSCManager(NULL, NULL, GENERIC_EXECUTE);
-	if(hSCM == NULL)
-		return false;
-	SC_HANDLE hSvc = ::OpenService(hSCM,sc.name,SERVICE_START|SERVICE_QUERY_STATUS|SERVICE_STOP);
-	if( hSvc == NULL)
+	CAtlString inPath(path),ocxID;
+	if(name[0]!='{')
 	{
-		::CloseServiceHandle(hSCM);
-		return false;
-	}
-	SERVICE_STATUS status;
-	DWORD dwWantState = 0;
-	if(sc.name==L"stop")
-	{ // 停止服务
-		if( ControlService(hSvc,SERVICE_CONTROL_STOP,&status) == FALSE)
-		{
-			CloseServiceHandle(hSvc);
-			CloseServiceHandle(hSCM);
+		CLSID     clsid;
+		if(!SUCCEEDED(::CLSIDFromProgID(name,&clsid)))
 			return false;
-		}
-		dwWantState = SERVICE_STOPPED;
-	}
-	else if(sc.name==L"run" || sc.name==L"start")
-	{
-		if( StartService( hSvc, NULL, NULL) == FALSE)
-		{
-			CloseServiceHandle( hSvc);
-			CloseServiceHandle( hSCM);
+		LPOLESTR pName=NULL;
+		::StringFromCLSID(clsid,&pName);
+		if(pName==NULL)
 			return false;
-		}
-		dwWantState = SERVICE_RUNNING;
+		ocxID = pName;
+		::CoTaskMemFree(pName);
 	}
 	else
+		ocxID = name;
+	HKEY key;
+	DWORD dwType;
+	CAtlString RegDir;
+	RegDir = _T("Wow6432Node\\CLSID\\");
+  	RegDir += ocxID;
+	RegDir += "\\InprocServer32";
+ 	::RegOpenKeyEx(HKEY_CLASSES_ROOT, RegDir, 0, KEY_WOW64_64KEY|KEY_WRITE, &key);
+	if(key==NULL)
+		::RegOpenKeyEx(HKEY_CLASSES_ROOT, RegDir, 0, KEY_WRITE|KEY_WOW64_32KEY, &key);
+	if(key)
 	{
-		CloseServiceHandle( hSvc);
-		CloseServiceHandle( hSCM);
-		return false;
-	}
-	if(!bWait)
-	{
-		CloseServiceHandle( hSvc);
-		CloseServiceHandle( hSCM);
+ 		::RegSetValueEx(key,NULL,NULL,REG_SZ,(BYTE*)inPath.GetString(),inPath.GetAllocLength()*sizeof(TCHAR));
+		::RegCloseKey(key);
 		return true;
-	}
-	while( QueryServiceStatus( hSvc, &status) == TRUE)
-	{
-		Sleep(status.dwWaitHint);
-		if(status.dwCurrentState==dwWantState)
-		{
-			CloseServiceHandle( hSvc);
-			CloseServiceHandle( hSCM);
-			return true;
-		}
-	}
-	CloseServiceHandle(hSvc);
-	CloseServiceHandle(hSCM);
-	return true;
+ 	}
+	return false;
 }
 
-size_t GetLocalScNoDriver(MapLocalSC &out)
+CAtlString GetOcxPath(LPCTSTR name)
 {
-	SC_HANDLE hSCM = ::OpenSCManager(NULL, NULL, SC_MANAGER_ENUMERATE_SERVICE);
-	if(hSCM == NULL)
-		return 0;
-	LPENUM_SERVICE_STATUS pServStatus = NULL;
-	DWORD dwBytesNeeded = 0, dwServCound = 0, dwResume = 0, dwRealBytes = 0;
-	BOOL bRet = ::EnumServicesStatus(hSCM, SERVICE_WIN32, SERVICE_STATE_ALL, NULL, 0, &dwBytesNeeded, &dwServCound, &dwResume);
-	dwRealBytes = dwBytesNeeded;
-	if(dwRealBytes==0)
+	CAtlString retPath,ocxID;
+	if(name[0]!='{')
 	{
-		::CloseServiceHandle(hSCM);
-		return 0;
+		CLSID     clsid;
+		if(!SUCCEEDED(::CLSIDFromProgID(name,&clsid)))
+			return retPath;
+		LPOLESTR pName=NULL;
+		::StringFromCLSID(clsid,&pName);
+		if(pName==NULL)
+			return retPath;
+		ocxID = pName;
+		::CoTaskMemFree(pName);
 	}
-	NOTHROW_NEW(ENUM_SERVICE_STATUS[dwRealBytes+1],pServStatus);
-	if(pServStatus==NULL)
+	else
+		ocxID = name;
+	HKEY key;
+	DWORD dwType;
+	CAtlString RegDir;
+	RegDir = _T("Wow6432Node\\CLSID\\");
+	RegDir += ocxID;
+	RegDir += "\\InprocServer32";
+	::RegOpenKeyEx(HKEY_CLASSES_ROOT, RegDir, 0, KEY_QUERY_VALUE|KEY_WOW64_64KEY, &key);
+	if(key==NULL)
+		::RegOpenKeyEx(HKEY_CLASSES_ROOT, RegDir, 0, KEY_QUERY_VALUE|KEY_WOW64_32KEY, &key);
+	wchar_t szPath[MAX_PATH] = {0};
+	DWORD dwSize = MAX_PATH;
+	if(key)
 	{
-		::CloseServiceHandle(hSCM);
-		return 0;
+		::RegQueryValueEx(key, NULL, NULL, &dwType, (LPBYTE)szPath, &dwSize);
+		::RegCloseKey(key);
+		retPath = szPath;
 	}
-	ZeroMemory(pServStatus, dwRealBytes+1);
-	bRet = ::EnumServicesStatus(hSCM, SERVICE_WIN32, SERVICE_STATE_ALL, pServStatus, dwRealBytes, &dwBytesNeeded, &dwServCound, &dwResume);
-	if(!bRet)
-	{
-		::CloseServiceHandle(hSCM);
-		delete []pServStatus;
-		return 0;
-	}
-	out.clear();
-	for(DWORD dwIdx=0;dwIdx<dwServCound;dwIdx++)
-	{
-		LocalSC sc;
-		sc.name = pServStatus[dwIdx].lpDisplayName;
-		sc.curState = pServStatus[dwIdx].ServiceStatus.dwCurrentState;
-		switch(sc.curState)
-		{
-		case SERVICE_STOPPED:
-			sc.state = L"stopped";
-			break;
-		case SERVICE_START_PENDING:
-			sc.state = L"start_pending";
-			break;
-		case SERVICE_STOP_PENDING:
-			sc.state = L"stop_pending";
-			break;
-		case SERVICE_RUNNING:
-			sc.state = L"running";
-			break;
-		case SERVICE_CONTINUE_PENDING:
-			sc.state = L"continue_pending";
-			break;
-		case SERVICE_PAUSE_PENDING:
-			sc.state = L"pause_pending";
-			break;
-		case SERVICE_PAUSED:
-			sc.state = L"paused";
-			break;
-		}
-		out[sc.name] = sc;
-	}
-	::CloseServiceHandle(hSCM);
-	delete []pServStatus;
-	return out.size();
+	return retPath;
 }
 
-CAtlString GetFileHash(LPCTSTR pszFileName)
+bool CanOpenFile(LPCTSTR file)
 {
-	long BUFSIZE = 1024;
-	long MD5LEN = 16;
-	BOOL bResult = FALSE;
-	HCRYPTPROV hProv = 0;
-	HCRYPTHASH hHash = 0;
-	HANDLE hFile = NULL;
-	BYTE rgbFile[1024];
-	DWORD cbRead = 0;
-	BYTE rgbHash[16];
-	DWORD cbHash = 0;
-	CHAR rgbDigits[] = "0123456789abcdef";
-	CAtlString strHashCode=_T("");	
-	if(NULL==pszFileName)
-	{
-		return strHashCode;
-	}
-	hFile = CreateFile(pszFileName,
-		GENERIC_READ,
-		FILE_SHARE_READ,
-		NULL,
-		OPEN_EXISTING,
-		FILE_FLAG_SEQUENTIAL_SCAN,
-		NULL);
-	if (INVALID_HANDLE_VALUE == hFile)
-	{
-		return strHashCode;
-	}
-	if (!CryptAcquireContext(&hProv,
-		NULL,
-		NULL,
-		PROV_RSA_FULL,
-		CRYPT_VERIFYCONTEXT))
-	{
-		CloseHandle(hFile);
-
-		return strHashCode;
-	}
-	if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash))
-	{		
-		CloseHandle(hFile);
-		CryptReleaseContext(hProv, 0);
-		return strHashCode;
-	}
-	while (bResult = ReadFile(hFile, rgbFile, BUFSIZE, 
-		&cbRead, NULL))
-	{
-		if (0 == cbRead)
-		{
-			break;
-		}
-		if (!CryptHashData(hHash, rgbFile, cbRead, 0))
-		{
-			CryptReleaseContext(hProv, 0);
-			CryptDestroyHash(hHash);
-			CloseHandle(hFile);
-			return strHashCode;
-		}
-	}
-	if (!bResult)
-	{		
-		CryptReleaseContext(hProv, 0);
-		CryptDestroyHash(hHash);
-		CloseHandle(hFile);
-
-		return strHashCode;
-	}
-	cbHash = MD5LEN;
-	TCHAR szTemp[3];
-	TCHAR szHashcode[33]={0};
-	if (CryptGetHashParam(hHash, HP_HASHVAL, rgbHash, &cbHash, 0))
-	{		
-		for (DWORD i = 0; i < cbHash; i++)
-		{
-			wsprintf(szTemp, _T("%c"), rgbDigits[rgbHash[i] >> 4]);
-			lstrcat(szHashcode, szTemp);
-
-			wsprintf(szTemp, _T("%c"), rgbDigits[rgbHash[i] & 0xf]);
-			lstrcat(szHashcode, szTemp);
-		}	
-		strHashCode=szHashcode;
-	}
-	CryptDestroyHash(hHash);
-	CryptReleaseContext(hProv, 0);
+	HANDLE hFile = ::CreateFile(file,GENERIC_ALL,0,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+	if(hFile==INVALID_HANDLE_VALUE)
+		return false;
 	CloseHandle(hFile);
-	return strHashCode;
-}
-
-CallEnd IsIDE(CAtlString   DriveName)   
-{   
-	CallEnd callEnd;
-	UINT ideType = ::GetDriveType(DriveName);
-	if(ideType != DRIVE_FIXED)
-	{
-		callEnd.bSuc = false;
-		callEnd.msg  = "非本地分区";
-		return callEnd;
-	}
-	callEnd.bSuc = true;
-	callEnd.msg  = "本地分区";
-	return callEnd;
+	return true;
 }
 
 bool InstallLink(LPCTSTR protocol,LPCTSTR appFilePath)
@@ -337,6 +151,57 @@ std::wstring GetHostName()
 	assert(result);
 	host_name.resize(name_len);
 	return host_name;
+}
+std::vector<std::string> GetLocalIp()
+{
+	std::vector<std::string> ret;
+	std::string strAddress;  
+	int nCardNo = 1;  
+	PIP_ADAPTER_INFO pIpAdapterInfo = new IP_ADAPTER_INFO();  
+ 	unsigned long stSize = sizeof(IP_ADAPTER_INFO);  
+	int nRel = ::GetAdaptersInfo(pIpAdapterInfo,&stSize);  
+	int netCardNum = 0;  
+	//记录每张网卡上的IP地址数量  
+	int IPnumPerNetCard = 0;  
+	if (ERROR_BUFFER_OVERFLOW == nRel)  
+	{  
+		delete pIpAdapterInfo;  
+		pIpAdapterInfo = (PIP_ADAPTER_INFO)new BYTE[stSize];  
+		nRel = ::GetAdaptersInfo(pIpAdapterInfo,&stSize);      
+	}  
+	if (ERROR_SUCCESS == nRel)  
+	{  
+		while (pIpAdapterInfo)  
+		{  
+ 			IP_ADDR_STRING *pIpAddrString =&(pIpAdapterInfo->IpAddressList);  
+			switch(pIpAdapterInfo->Type)  
+			{  
+			case MIB_IF_TYPE_OTHER:  
+			case MIB_IF_TYPE_ETHERNET:  
+			case MIB_IF_TYPE_TOKENRING:  
+			case MIB_IF_TYPE_FDDI:  
+			case MIB_IF_TYPE_PPP:  
+			case MIB_IF_TYPE_LOOPBACK:  
+			case MIB_IF_TYPE_SLIP:  
+				{  
+					strAddress = pIpAddrString->IpAddress.String;  
+					if(std::string("0.0.0.0")==strAddress)  
+						break;  
+					ret.push_back(strAddress);
+					nCardNo++;  
+					break;  
+				}  
+			default:  
+				break;  
+			}  
+			pIpAdapterInfo = pIpAdapterInfo->Next;  
+		}  
+	}  
+ 	if (pIpAdapterInfo)  
+	{  
+		delete pIpAdapterInfo;  
+	}
+	return ret;
 }
 
 bool IsModuleHandleValid(HMODULE module_handle)
@@ -759,10 +624,10 @@ HANDLE FindProcessByPath(const CAtlString& szPath)
 			do  
 			{
 				TCHAR chPath[MAX_PATH] = { 0 };
-				HANDLE hTmp = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
+				HANDLE hTmp = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,processEntry32.th32ProcessID);
 				if(hTmp){
 					::GetModuleFileNameEx(hTmp,NULL,chPath,MAX_PATH);
-					if(szPath==chPath)
+					if(0==szPath.CompareNoCase(chPath))
 					{
 						handle = hTmp;
 						break;
@@ -779,8 +644,13 @@ bool KillProcess(const CAtlString& szProcessName)
 {
 	bool bRet = false;
 	bool cmpFullDir = false;
-	if(-1!=szProcessName.Find(_T(":\\")))
-		cmpFullDir=true;	//按全路径比较	
+	CAtlString cmpName(szProcessName);
+	cmpName = cmpName.Trim();
+	cmpName.Replace('/','\\');
+	if(-1!=cmpName.Find(_T(":\\")))
+		cmpFullDir=true;	//按全路径比较
+	if(szProcessName.IsEmpty())
+		return false;
 	PROCESSENTRY32 processEntry32;   
 	HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
 	if(((int)toolHelp32Snapshot) != -1)  
@@ -793,13 +663,14 @@ bool KillProcess(const CAtlString& szProcessName)
 				if(cmpFullDir)
 				{
 					TCHAR chPath[MAX_PATH] = { 0 };
-					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
+					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,processEntry32.th32ProcessID);
 					if(handle){
 						::GetModuleFileNameEx(handle,NULL,chPath,MAX_PATH);
-						if(szProcessName==chPath)
+						CAtlString tmpPath(chPath);
+						tmpPath.Replace('/','\\');
+						if(tmpPath.CompareNoCase(cmpName)==0)
 						{
 							::TerminateProcess(handle,0xdead);
-							::WaitForSingleObject(handle,INFINITE);
 							::CloseHandle(handle);
 							bRet = true; 
 							break;
@@ -809,10 +680,9 @@ bool KillProcess(const CAtlString& szProcessName)
 				}
 				else if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
 				{
-					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
+					HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|SYNCHRONIZE,FALSE,processEntry32.th32ProcessID);
 					if(handle){
 						::TerminateProcess(handle,0xdead);
-						::WaitForSingleObject(handle,INFINITE);
 						::CloseHandle(handle);
 						bRet = true;
 					}
