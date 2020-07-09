@@ -136,7 +136,7 @@ bool  OpenSelPathDialog(LPTSTR outSel,HWND hOwner,LPCTSTR pDefaultDir,LPCTSTR pT
 }
 /*------------------------------------------------------------------------*/
 DWORD 	EnumFloderItem(LPCTSTR lpRoot,DWORD dwAttributes,
-									   LPVOID lpParam,DirFilter *filter)
+					   LPVOID lpParam,DirFilter *filter)
 {
 	HANDLE	hFind	= NULL;
 	DWORD	dwError	= 0;
@@ -185,14 +185,20 @@ DWORD  CheckDir( LPCTSTR pDir,BOOL bCreate,LPSECURITY_ATTRIBUTES lpSecurity)
 	DWORD dwRet = 0;	
 	LPTSTR pSub  = NULL,pRoot=NULL;
 	CAtlString strTmp,strDir(pDir);
-	int nDot = strDir.ReverseFind('.');
 	strDir.Replace('/','\\');
+	if(strDir.IsEmpty())
+		return -1;
+	int nDot = strDir.ReverseFind('.');
 	if( nDot != -1 )
 	{
 		int nSlashes = 0;
 		nSlashes = strDir.ReverseFind('\\');
+		if(nSlashes==-1)
+			return -1; //路径格式不正确
 		strDir = strDir.Mid(0,nSlashes);
 	}
+	if(strDir[strDir.GetLength()-1]!='\\')
+		strDir += '\\';
 	pRoot = (LPTSTR)strDir.GetString();
 	while(pSub = ::PathFindNextComponent(pRoot))
 	{
@@ -332,6 +338,22 @@ CAtlString GetLocalAppDataPath()
 	}
 	return ret;
 }
+CAtlString GetDocPath()
+{
+ 	TCHAR szDocument[MAX_PATH] = { 0 };
+ 	LPITEMIDLIST pidl = NULL;
+	::SHGetSpecialFolderLocation(NULL, CSIDL_COMMON_DOCUMENTS, &pidl);
+	SHGetPathFromIDList(pidl, szDocument);
+	CString ret = szDocument;
+	TCHAR end = ret[ret.GetLength() - 1];
+	if ('\\' != end && end != '/') {
+		ret += '\\';
+	}
+	if (_waccess(CT2CW(ret), 0) == -1) {
+		_wmkdir(CT2CW(ret));
+	}
+	return ret;
+}
 /*-----------------------------------------------------------------------------------*/
 #if defined(_UNICODE)
 typedef DWORD(WINAPI* GetProcessFileNameW)(HANDLE, HMODULE, LPWSTR, DWORD);
@@ -425,7 +447,7 @@ CAtlString PathGetFileName(const CAtlString& f)
 		return ret;
 	}
 	nEnd = nEnd_L > nEnd_R ? nEnd_L : nEnd_R;
-	ret = ret.Mid(nEnd + 1);
+	ret = ret.Mid(nEnd + 1, nDot - nEnd - 1);
 	return ret;
 }
 /*---------------------------------------------------------------------------------------------*/
@@ -667,21 +689,4 @@ DWORD	CountDirFiles(const CAtlString& dir)
 bool RenameFile(const CAtlString& src, const CAtlString& dst)
 {
 	return MoveFileEx(src,dst,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH|MOVEFILE_COPY_ALLOWED)?true:false;
-}
-
-CAtlString GetDocPath()
-{
- 	TCHAR szDocument[MAX_PATH] = { 0 };
- 	LPITEMIDLIST pidl = NULL;
-	::SHGetSpecialFolderLocation(NULL, CSIDL_COMMON_DOCUMENTS, &pidl);
-	SHGetPathFromIDList(pidl, szDocument);
-	CString ret = szDocument;
-	TCHAR end = ret[ret.GetLength() - 1];
-	if ('\\' != end && end != '/') {
-		ret += '\\';
-	}
-	if (_waccess(CT2CW(ret), 0) == -1) {
-		_wmkdir(CT2CW(ret));
-	}
-	return ret;
 }
