@@ -95,4 +95,22 @@ DWORD CountDirFiles(const CAtlString& dir);
 
 bool RenameFile(const CAtlString& src,const CAtlString& dst);
 
+//获取我的文档路径
 CAtlString GetDocPath();
+//获取桌面路径
+CAtlString GetDesktopPath();
+//获取程序组路径
+CAtlString GetProgramsPath();
+
+/*
+函数功能：对指定文件在指定的目录下创建其快捷方式
+函数参数：
+lpszFileName    指定文件，为NULL表示当前进程的EXE文件。
+lpszLnkFileName 快捷方式名称，为NULL表示EXE文件名。
+wHotkey         为0表示不设置快捷键
+pszDescription  备注
+iShowCmd        运行方式，默认为常规窗口
+*/
+bool CreateFileShortcut(LPCWSTR lpszFileName,LPCWSTR lpszSaveTo,LPCWSTR lpszIcon,
+						LPCWSTR lpszLnkFileName,LPCWSTR lpszWorkDir,WORD wHotkey,
+						LPCWSTR lpszDescription,int iShowCmd = SW_SHOWNORMAL);

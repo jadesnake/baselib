@@ -3,6 +3,7 @@
 #include <io.h>
 #include <ShellAPI.h>
 #include "Dir.h"
+#pragma comment(lib, "shell32.lib")
 
 CAtlString	GetCurDir(void)
 {
@@ -317,13 +318,13 @@ BOOL IsPathFind( const CAtlString& strPath )
 	return (GetFileAttributes(strPath) != INVALID_FILE_ATTRIBUTES);
 }
 /*-----------------------------------------------------------------------------------*/
-CAtlString GetLocalAppDataPath()
+CAtlString GetSystemPath(DWORD sp)
 {
 	TCHAR lpszDefaultDir[MAX_PATH];
 	TCHAR szDocument[MAX_PATH] = { 0 };
 	memset(lpszDefaultDir, 0, sizeof(lpszDefaultDir));
 	LPITEMIDLIST pidl = NULL;
-	::SHGetSpecialFolderLocation(NULL, CSIDL_LOCAL_APPDATA, &pidl);
+	::SHGetSpecialFolderLocation(NULL, sp, &pidl);
 	if (pidl && SHGetPathFromIDList(pidl, szDocument))
 	{
 		GetShortPathName(szDocument, lpszDefaultDir, _MAX_PATH);
@@ -338,21 +339,24 @@ CAtlString GetLocalAppDataPath()
 	}
 	return ret;
 }
+
+CAtlString GetLocalAppDataPath()
+{
+	return GetSystemPath(CSIDL_LOCAL_APPDATA);
+}
+
 CAtlString GetDocPath()
 {
- 	TCHAR szDocument[MAX_PATH] = { 0 };
- 	LPITEMIDLIST pidl = NULL;
-	::SHGetSpecialFolderLocation(NULL, CSIDL_COMMON_DOCUMENTS, &pidl);
-	SHGetPathFromIDList(pidl, szDocument);
-	CString ret = szDocument;
-	TCHAR end = ret[ret.GetLength() - 1];
-	if ('\\' != end && end != '/') {
-		ret += '\\';
-	}
-	if (_waccess(CT2CW(ret), 0) == -1) {
-		_wmkdir(CT2CW(ret));
-	}
-	return ret;
+	return GetSystemPath(CSIDL_COMMON_DOCUMENTS);
+}
+
+CAtlString GetDesktopPath()
+{
+	return GetSystemPath(CSIDL_DESKTOP);
+}
+CAtlString GetProgramsPath()
+{
+	return GetSystemPath(CSIDL_PROGRAMS);
 }
 /*-----------------------------------------------------------------------------------*/
 #if defined(_UNICODE)
@@ -686,7 +690,63 @@ DWORD	CountDirFiles(const CAtlString& dir)
 	//清空移动过的目录
 	return dwRet;
 }
+
 bool RenameFile(const CAtlString& src, const CAtlString& dst)
 {
 	return MoveFileEx(src,dst,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH|MOVEFILE_COPY_ALLOWED)?true:false;
+}
+
+
+bool CreateFileShortcut(LPCWSTR lpszFileName,LPCWSTR lpszSaveTo,LPCWSTR lpszIcon,LPCWSTR lpszLnkFileName,
+						LPCWSTR lpszWorkDir,WORD wHotkey,LPCWSTR lpszDescription,int iShowCmd)
+{
+	HRESULT hr = S_OK;
+	IShellLink     *pLink=NULL;  //IShellLink对象指针
+	IPersistFile   *ppf=NULL; //IPersisFil对象指针
+	hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (void**)&pLink);
+	if(FAILED(hr))
+		return false;
+	//从IShellLink对象中获取IPersistFile接口
+	hr = pLink->QueryInterface(IID_IPersistFile, (void**)&ppf);
+	if (FAILED(hr))
+	{
+		pLink->Release();
+		return false;
+	}
+	if (lpszFileName == NULL)
+		pLink->SetPath(_wpgmptr);
+	else
+		pLink->SetPath(lpszFileName);
+	//工作目录
+	if (lpszWorkDir)
+		pLink->SetWorkingDirectory(lpszWorkDir);
+	if (lpszIcon)
+		pLink->SetIconLocation(lpszIcon,0);
+	//快捷键
+	if (wHotkey)
+		pLink->SetHotkey(wHotkey);
+	//备注
+	if (lpszDescription)
+		pLink->SetDescription(lpszDescription);
+	//显示方式
+	pLink->SetShowCmd(iShowCmd);
+	//快捷方式的路径 + 名称
+	CAtlString linkDir(lpszSaveTo);
+	CAtlString saveto;
+	if(linkDir.IsEmpty())
+		linkDir = GetDesktopPath();
+	wchar_t szBuffer[MAX_PATH];
+	if (lpszLnkFileName != NULL) //指定了快捷方式的名称
+ 		saveto = AppendUrl(linkDir, lpszLnkFileName);
+ 	else
+	{
+ 		saveto = AppendUrl(linkDir, _wpgmptr);
+		saveto.Replace(L".exe",L"");
+	}
+ 	saveto += L".lnk";
+	//保存快捷方式到指定目录下
+	hr = ppf->Save(saveto, TRUE);
+	ppf->Release();
+	pLink->Release();
+	return SUCCEEDED(hr);
 }
