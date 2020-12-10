@@ -358,6 +358,15 @@ CAtlString GetProgramsPath()
 {
 	return GetSystemPath(CSIDL_PROGRAMS);
 }
+CAtlString GetUsrDesktopPath()
+{
+	return GetSystemPath(CSIDL_COMMON_DESKTOPDIRECTORY);
+}
+CAtlString GetCommonProgramsPath()
+{
+	return GetSystemPath(CSIDL_COMMON_PROGRAMS);
+}
+
 /*-----------------------------------------------------------------------------------*/
 #if defined(_UNICODE)
 typedef DWORD(WINAPI* GetProcessFileNameW)(HANDLE, HMODULE, LPWSTR, DWORD);
@@ -695,10 +704,13 @@ bool RenameFile(const CAtlString& src, const CAtlString& dst)
 {
 	return MoveFileEx(src,dst,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH|MOVEFILE_COPY_ALLOWED)?true:false;
 }
-
-
-bool CreateFileShortcut(LPCWSTR lpszFileName,LPCWSTR lpszSaveTo,LPCWSTR lpszIcon,LPCWSTR lpszLnkFileName,
-						LPCWSTR lpszWorkDir,WORD wHotkey,LPCWSTR lpszDescription,int iShowCmd)
+/*------------------------------------------------------------------------------------------*/
+Shortcut::Shortcut()
+{
+	wHotKey = 0;
+	showCmd = SW_SHOWNORMAL;
+}
+bool ResetShortcut(LPCWSTR lnkfile,Shortcut &outInfo)
 {
 	HRESULT hr = S_OK;
 	IShellLink     *pLink=NULL;  //IShellLink对象指针
@@ -713,31 +725,107 @@ bool CreateFileShortcut(LPCWSTR lpszFileName,LPCWSTR lpszSaveTo,LPCWSTR lpszIcon
 		pLink->Release();
 		return false;
 	}
-	if (lpszFileName == NULL)
+	hr = ppf->Load(lnkfile, STGM_WRITE);
+	if(!SUCCEEDED(hr))
+		return false;
+	if(outInfo.wHotKey)
+		pLink->SetHotkey(outInfo.wHotKey);
+	if(!outInfo.description.IsEmpty())
+		pLink->SetDescription(outInfo.description);
+	if(!outInfo.arguments.IsEmpty())
+		pLink->SetArguments(outInfo.arguments);
+	if(!outInfo.icon.IsEmpty())
+		pLink->SetIconLocation(outInfo.icon, 0);
+	if(!outInfo.workDir.IsEmpty())
+		pLink->SetWorkingDirectory(outInfo.workDir);
+	if(!outInfo.exefile.IsEmpty())
+		pLink->SetPath(outInfo.exefile);
+	pLink->SetShowCmd(outInfo.showCmd);
+	ppf->Save(lnkfile,TRUE);
+	ppf->Release();
+	pLink->Release();
+	return true;
+}
+bool GetShortcut(LPCWSTR lnkfile,Shortcut &outInfo)
+{
+	HRESULT hr = S_OK;
+	IShellLink     *pLink=NULL;  //IShellLink对象指针
+	IPersistFile   *ppf=NULL; //IPersisFil对象指针
+	hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (void**)&pLink);
+	if(FAILED(hr))
+		return false;
+	//从IShellLink对象中获取IPersistFile接口
+	hr = pLink->QueryInterface(IID_IPersistFile, (void**)&ppf);
+	if (FAILED(hr))
+	{
+		pLink->Release();
+		return false;
+	}
+	hr = ppf->Load(lnkfile, STGM_READ);
+	if(!SUCCEEDED(hr))
+		return false;
+	TCHAR chTmp[20480];
+	memset(chTmp,0,sizeof(chTmp));
+	pLink->GetHotkey(&outInfo.wHotKey);
+	if(SUCCEEDED(pLink->GetDescription(chTmp, 20480)))
+		outInfo.description = chTmp;
+	memset(chTmp,0,sizeof(chTmp));
+	if(SUCCEEDED(pLink->GetArguments(chTmp, 20480)))
+		outInfo.arguments = chTmp;
+	memset(chTmp,0,sizeof(chTmp));
+	int idx = 0;
+	if(SUCCEEDED(pLink->GetIconLocation(chTmp, 20480, &idx)))
+		outInfo.icon = chTmp;
+	if(SUCCEEDED(pLink->GetWorkingDirectory(chTmp, 20480)))
+		outInfo.workDir = chTmp;
+	WIN32_FIND_DATA wfd;
+	if(SUCCEEDED(pLink->GetPath(chTmp, 20480,&wfd, SLGP_SHORTPATH)))
+		outInfo.exefile = chTmp;
+	pLink->GetShowCmd(&outInfo.showCmd);
+	ppf->Release();
+	pLink->Release();
+	return true;
+}
+bool CreateFileShortcut(LPCWSTR lpszSaveTo,const Shortcut &inInfo)
+{
+	HRESULT hr = S_OK;
+	IShellLink     *pLink=NULL;  //IShellLink对象指针
+	IPersistFile   *ppf=NULL; //IPersisFil对象指针
+	hr = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (void**)&pLink);
+	if(FAILED(hr))
+		return false;
+	//从IShellLink对象中获取IPersistFile接口
+	hr = pLink->QueryInterface(IID_IPersistFile, (void**)&ppf);
+	if (FAILED(hr))
+	{
+		pLink->Release();
+		return false;
+	}
+	if(inInfo.exefile.IsEmpty())
 		pLink->SetPath(_wpgmptr);
 	else
-		pLink->SetPath(lpszFileName);
+		pLink->SetPath(inInfo.exefile);
 	//工作目录
-	if (lpszWorkDir)
-		pLink->SetWorkingDirectory(lpszWorkDir);
-	if (lpszIcon)
-		pLink->SetIconLocation(lpszIcon,0);
+	if (!inInfo.workDir.IsEmpty())
+		pLink->SetWorkingDirectory(inInfo.workDir);
+	if (!inInfo.icon.IsEmpty())
+		pLink->SetIconLocation(inInfo.icon,0);
 	//快捷键
-	if (wHotkey)
-		pLink->SetHotkey(wHotkey);
+	if (inInfo.wHotKey)
+		pLink->SetHotkey(inInfo.wHotKey);
 	//备注
-	if (lpszDescription)
-		pLink->SetDescription(lpszDescription);
+	if (!inInfo.description.IsEmpty())
+		pLink->SetDescription(inInfo.description);
 	//显示方式
-	pLink->SetShowCmd(iShowCmd);
+	pLink->SetShowCmd(inInfo.showCmd);
 	//快捷方式的路径 + 名称
 	CAtlString linkDir(lpszSaveTo);
 	CAtlString saveto;
 	if(linkDir.IsEmpty())
 		linkDir = GetDesktopPath();
 	wchar_t szBuffer[MAX_PATH];
-	if (lpszLnkFileName != NULL) //指定了快捷方式的名称
- 		saveto = AppendUrl(linkDir, lpszLnkFileName);
+	if (!inInfo.linkName.IsEmpty()) //指定了快捷方式的名称
+ 		saveto = AppendUrl(linkDir, inInfo.linkName);
  	else
 	{
  		saveto = AppendUrl(linkDir, _wpgmptr);

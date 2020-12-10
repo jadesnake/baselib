@@ -101,6 +101,10 @@ CAtlString GetDocPath();
 CAtlString GetDesktopPath();
 //获取程序组路径
 CAtlString GetProgramsPath();
+//
+CAtlString GetUsrDesktopPath();
+//
+CAtlString GetCommonProgramsPath();
 
 /*
 函数功能：对指定文件在指定的目录下创建其快捷方式
@@ -111,6 +115,21 @@ wHotkey         为0表示不设置快捷键
 pszDescription  备注
 iShowCmd        运行方式，默认为常规窗口
 */
-bool CreateFileShortcut(LPCWSTR lpszFileName,LPCWSTR lpszSaveTo,LPCWSTR lpszIcon,
-						LPCWSTR lpszLnkFileName,LPCWSTR lpszWorkDir,WORD wHotkey,
-						LPCWSTR lpszDescription,int iShowCmd = SW_SHOWNORMAL);
+class Shortcut{
+public:
+	Shortcut();
+public:
+	CAtlString exefile;
+	CAtlString linkName;
+	CAtlString description;
+	CAtlString workDir;
+	CAtlString icon;
+	CAtlString arguments;
+	WORD wHotKey;
+	int showCmd;
+};
+bool CreateFileShortcut(LPCWSTR lpszSaveTo,const Shortcut &inInfo);
+
+bool GetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
+
+bool ResetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
