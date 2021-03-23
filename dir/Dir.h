@@ -133,3 +133,5 @@ bool CreateFileShortcut(LPCWSTR lpszSaveTo,const Shortcut &inInfo);
 bool GetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
 
 bool ResetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
+
+CAtlString GetMaxBetysDrive();

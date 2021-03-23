@@ -838,3 +838,54 @@ bool CreateFileShortcut(LPCWSTR lpszSaveTo,const Shortcut &inInfo)
 	pLink->Release();
 	return SUCCEEDED(hr);
 }
+/*---------------------------------------------------------------------------------------------*/
+double GetDriveFreeGB(LPSTR drive)
+{
+	DWORDLONG i64FreeBytesToCaller = 0;
+	DWORDLONG i64TotalBytes = 0;
+	DWORDLONG i64FreeBytes = 0;
+	GetDiskFreeSpaceExA(drive, (PULARGE_INTEGER)&i64FreeBytesToCaller,  
+		(PULARGE_INTEGER)&i64TotalBytes, (PULARGE_INTEGER)&i64FreeBytes);
+	double dFreeGBs=0;
+	dFreeGBs = i64FreeBytes*9.3132e-10;
+	return dFreeGBs;
+}
+CAtlString GetMaxBetysDrive()
+{
+	int driveCount = 0;
+	DWORD driveInfo = GetLogicalDrives();
+	while (driveInfo) 
+	{
+		if (driveInfo & 1) {
+			driveCount++;
+		}
+		driveInfo >>= 1;
+	}
+	int driveStrLen = GetLogicalDriveStrings(0, NULL);
+	TCHAR *driveStr = new TCHAR[driveStrLen];
+	GetLogicalDriveStrings(driveStrLen, driveStr);
+	TCHAR *lpDriveStr = driveStr;
+	double dMax = 0.00;
+	CAtlString strCurDrive;
+	for (int i = 0; i < driveCount; i++) 
+	{
+		UINT driveType = GetDriveType(lpDriveStr);	
+		if(driveType == DRIVE_FIXED)
+		{
+			CAtlString str ;
+			double dTemp = 0.00;
+			str = lpDriveStr;
+			//v.push_back(str);
+
+			dTemp = GetDriveFreeGB((char*)CT2CA(str));
+			if(dTemp>dMax)
+			{
+				dMax = dTemp;
+				strCurDrive = str;
+			}
+		}		
+		lpDriveStr += 4;		
+	}
+	delete driveStr;
+	return strCurDrive;
+}
