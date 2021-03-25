@@ -6,6 +6,13 @@
 
 namespace base
 {
+	//遍历系统服务列表根据名称判断是否存在目标服务
+	bool HaveService(const CAtlString &strSrvName);
+	//重启服务
+	bool RestartService(const CAtlString &strSrvName);
+	//关闭服务
+	bool StopService(const CAtlString &strSrvName); 
+
 	//自动导入证书至根证书颁发机构
 	//certfile 证书文件
 	//name 证书名称
@@ -91,14 +98,15 @@ namespace base
 	CAtlString GetOcxPath(LPCTSTR name);
 	bool SetOcxPath(LPCTSTR name,LPCTSTR path);
 
-#define MAX_TRACEBUF    502
 	void  TraceA(LPCSTR pstrFormat, ...);
 	void  TraceW(LPCWSTR pstrFormat, ...);
-#ifdef _UNICODE
-#define MyTRACE TraceW
-#else
-#define MyTRACE TraceA
-#endif
+	
+	#define MAX_TRACEBUF    502
+	#ifdef _UNICODE
+	#define MyTRACE TraceW
+	#else
+	#define MyTRACE TraceA
+	#endif
 } 
 
 

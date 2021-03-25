@@ -16,6 +16,86 @@
 
 namespace base	{
 	
+	bool HaveService( const CAtlString &strSrvName )
+	{
+		bool bRet = false;
+		LPCWSTR lpMachineName = NULL;
+		LPCWSTR lpDatabaseName = NULL;
+		DWORD dwSCManagerDesiredAccess = SC_MANAGER_ALL_ACCESS;
+		SC_HANDLE scHandle = OpenSCManager(lpMachineName, lpDatabaseName, dwSCManagerDesiredAccess);
+		if(scHandle ==NULL)
+			bRet = false;
+		else
+		{
+			LPCTSTR lpServiceName =strSrvName;
+			DWORD dwDesiredAccess = SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP;
+			SC_HANDLE serviceHandle = OpenService(scHandle, lpServiceName, dwDesiredAccess);
+			if (serviceHandle)
+			{
+				bRet = true;
+				CloseServiceHandle(serviceHandle);
+				CloseServiceHandle(scHandle);
+				return bRet;
+			}
+			CloseServiceHandle(serviceHandle);
+			CloseServiceHandle(scHandle);
+		}
+		return bRet;
+	}
+	bool RestartService(const CAtlString &strSrvName)
+	{
+		bool retEnd = false;
+		CAtlString svrName;
+		LPCWSTR lpMachineName = NULL;
+		LPCWSTR lpDatabaseName = NULL;
+		DWORD dwSCManagerDesiredAccess = SC_MANAGER_ALL_ACCESS,runCode=0;
+		SC_HANDLE scHandle = OpenSCManager(lpMachineName, lpDatabaseName, dwSCManagerDesiredAccess);
+		if(scHandle ==NULL)
+			return false;
+		DWORD dwDesiredAccess = SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP;
+		SC_HANDLE serviceHandle = OpenService(scHandle, strSrvName, dwDesiredAccess);
+		if (serviceHandle)
+		{
+			SERVICE_STATUS status;
+			QueryServiceStatus(serviceHandle, &status);
+			if (status.dwCurrentState != SERVICE_STOPPED)
+				ControlService(serviceHandle,SERVICE_CONTROL_STOP, &status);
+			StartService(serviceHandle, 0, NULL);
+			CloseServiceHandle(serviceHandle);
+			CloseServiceHandle(scHandle);
+			return true;
+		}
+		CloseServiceHandle(serviceHandle);
+		CloseServiceHandle(scHandle);
+		return false;
+	}
+	bool StopService(const CAtlString &strSrvName)
+	{
+		bool retEnd = false;
+		CAtlString svrName;
+		LPCWSTR lpMachineName = NULL;
+		LPCWSTR lpDatabaseName = NULL;
+		DWORD dwSCManagerDesiredAccess = SC_MANAGER_ALL_ACCESS,runCode=0;
+		SC_HANDLE scHandle = OpenSCManager(lpMachineName, lpDatabaseName, dwSCManagerDesiredAccess);
+		if(scHandle ==NULL)
+			return false;
+		DWORD dwDesiredAccess = SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP;
+		SC_HANDLE serviceHandle = OpenService(scHandle, strSrvName, dwDesiredAccess);
+		if (serviceHandle)
+		{
+			SERVICE_STATUS status;
+			QueryServiceStatus(serviceHandle, &status);
+			if (status.dwCurrentState != SERVICE_STOPPED)
+				ControlService(serviceHandle,SERVICE_CONTROL_STOP, &status);
+			CloseServiceHandle(serviceHandle);
+			CloseServiceHandle(scHandle);
+			return true;
+		}
+		CloseServiceHandle(serviceHandle);
+		CloseServiceHandle(scHandle);
+		return false;
+	}
+
 	bool AutoImportCertFile(CAtlString certfile,CAtlString name)
 	{
 		HCERTSTORE hCertStore = CertOpenStore(CERT_STORE_PROV_SYSTEM,0,NULL,
