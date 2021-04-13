@@ -278,12 +278,9 @@ CAtlString GetDllPath(LPCTSTR pszFileName)
 	TCHAR sDir[_MAX_DIR];
 	TCHAR sFname[_MAX_FNAME];
 	TCHAR sExt[_MAX_EXT];
-
 	GetModuleFileName(GetModuleHandle(pszFileName), sFilename, _MAX_PATH);
 	_tsplitpath_s(sFilename, sDrive, sDir, sFname, sExt);
-
 	CAtlString strFilePath(CAtlString(sDrive) + CAtlString(sDir));
-
 	return strFilePath;
 }
 
@@ -301,6 +298,7 @@ CAtlString GetAppPath()
 	CAtlString filename(CAtlString(sDrive) + CAtlString(sDir));
 	return filename;
 }
+
 CAtlString getAppFilePath()
 {
 	TCHAR sFilename[_MAX_PATH];
@@ -316,6 +314,30 @@ CAtlString getAppFilePath()
 BOOL IsPathFind( const CAtlString& strPath )
 {
 	return (GetFileAttributes(strPath) != INVALID_FILE_ATTRIBUTES);
+}
+CAtlString FindFrontPath(const CAtlString& path)
+{
+	CAtlString rEmpty(path);
+	if(path.IsEmpty())
+		return rEmpty;
+	rEmpty.Replace('/','\\');
+	int endpos=0;
+	do 
+	{
+		endpos = rEmpty.ReverseFind('\\');
+		if(endpos==0||endpos==-1)
+		{
+			rEmpty.Empty();
+			return rEmpty;
+		}
+		if((endpos+1)==rEmpty.GetLength())
+		{
+			rEmpty.Delete(endpos);
+			continue;
+		}
+		break;
+	}while(1);
+	return rEmpty.Mid(0,endpos);
 }
 /*-----------------------------------------------------------------------------------*/
 CAtlString GetSystemPath(DWORD sp)
@@ -493,6 +515,16 @@ CAtlString GetAppName()
 	_tsplitpath_s(sFilename, sDrive, sDir, sFname, sExt);
 	CAtlString filename(sFname);
 	return filename;
+}
+CAtlString GetFullAppName()
+{
+	TCHAR sFilename[_MAX_PATH];
+	TCHAR sDrive[_MAX_DRIVE];
+	TCHAR sDir[_MAX_DIR];
+	TCHAR sFname[_MAX_FNAME];
+	TCHAR sExt[_MAX_EXT];
+ 	GetModuleFileName( NULL, sFilename, _MAX_PATH);
+	return (CAtlString)sFilename;
 }
 /*-----------------------------------------------------------------------------------------------*/
 bool MoveFileInernal(const CAtlString& a, const CAtlString& b)

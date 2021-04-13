@@ -84,6 +84,10 @@ CAtlString FindFilePath(const CAtlString& path);
 
 //获取当前应用名称
 CAtlString GetAppName();
+//获取全路径
+CAtlString GetFullAppName();
+
+CAtlString FindFrontPath(const CAtlString& path);
 
 bool CopyDirByFilter(const CString& dir, const CString& dst,DirFilter *fun);
 
