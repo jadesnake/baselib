@@ -9,6 +9,7 @@
 #include <tlhelp32.h>
 #include <Psapi.h>
 #include <Cryptuiapi.h>
+#include <ShellAPI.h>
 #pragma comment(lib,"Cryptui.lib")
 #pragma comment(lib,"Crypt32.lib")
 #pragma comment(lib,"Netapi32.lib")
@@ -754,7 +755,7 @@ namespace base	{
 		{
 			MODULEENTRY32 me32;
 			me32.dwSize  =sizeof(MODULEENTRY32);
-			if(Module32First(toolHelp32Snapshot,&me32))
+			if(Module32First(help32Snapshot,&me32))
 				retName = me32.szExePath;
 			::CloseHandle(help32Snapshot);
 		}
@@ -764,7 +765,7 @@ namespace base	{
 		if(hProc)
 		{
 			TCHAR chPath[MAX_PATH+1] = { 0 };
-			::GetModuleFileNameEx(hTmp,NULL,chPath,MAX_PATH);
+			::GetModuleFileNameEx(hProc,NULL,chPath,MAX_PATH);
 			retName = chPath;
 			::CloseHandle(hProc);
 		}
