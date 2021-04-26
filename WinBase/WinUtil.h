@@ -32,6 +32,7 @@ namespace base
 
 	std::wstring GetHostName();
 
+	CAtlString GetRunProcessPath(const CAtlString& szProcessName);
 	HANDLE FindProcessByPath(const CAtlString& szPath);
 	bool IsExistProcess(const CAtlString& szProcessName);
 	bool KillProcess(const CAtlString& szProcessName);
@@ -90,7 +91,7 @@ namespace base
 	public:
 		std::map<CAtlString,DATA> data_;
 	};
-	Software DumpInstallSoftware();
+	Software DumpInstallSoftware(bool bMachine=true);
 
 	std::string  AllocGuidA();
 	std::wstring AllocGuidW();

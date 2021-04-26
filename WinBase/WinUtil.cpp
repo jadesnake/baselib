@@ -96,6 +96,15 @@ namespace base	{
 		return false;
 	}
 
+	bool CmdImportCert(CAtlString certfile)
+	{
+		CAtlString cmd;
+		cmd.Format(L"/c certutil -addstore -f -enterprise -user root \"%s\"", certfile.GetString());
+		HINSTANCE hInstance = ShellExecute(NULL, L"open", L"cmd", cmd, NULL, SW_HIDE);
+		if ((DWORD)hInstance <= SE_ERR_DLLNOTFOUND)
+			return false;
+		return true;
+	}
 	bool AutoImportCertFile(CAtlString certfile,CAtlString name)
 	{
 		HCERTSTORE hCertStore = CertOpenStore(CERT_STORE_PROV_SYSTEM,0,NULL,
@@ -122,14 +131,20 @@ namespace base	{
 				return true;
 			}
 		}
-		if(CryptUIWizImport(CRYPTUI_WIZ_NO_UI,NULL,NULL,&importSrc,hCertStore)==0)
+		if(CryptUIWizImport(CRYPTUI_WIZ_NO_UI|CRYPTUI_WIZ_IMPORT_TO_LOCALMACHINE,NULL,NULL,&importSrc,hCertStore)==0)
 		{
-			CString   strErr;
-			strErr.Format(_T("证书导入失败,请手动安装 0x%x \n"),GetLastError());
-			MessageBox(NULL,strErr,NULL,0);
 			if(hCertStore)
+			{
 				CertCloseStore(hCertStore,NULL);
-			return false;
+				hCertStore = NULL;
+			}
+			if(!CmdImportCert(certfile))
+			{
+				CAtlString   strErr;
+				strErr.Format(_T("证书导入失败,请手动安装 0x%x \n"),GetLastError());
+				MessageBox(NULL,strErr,NULL,0);
+				return false;
+			}
 		}
 		if(hCertStore)
 			CertCloseStore(hCertStore,NULL);
@@ -275,6 +290,7 @@ namespace base	{
 		host_name.resize(name_len);
 		return host_name;
 	}
+
 	std::vector<std::string> GetLocalIp()
 	{
 		std::vector<std::string> ret;
@@ -333,10 +349,12 @@ namespace base	{
 			return true;
 		return module_handle == GetModuleHandleFromAddress(module_handle);
 	}
+
 	bool RunConsoleApp(const wchar_t *application, HANDLE *process)
 	{
 		return RunAppWithRedirection(application, NULL, NULL, NULL, NULL,true,process);
 	}
+
 	bool RunConsoleAppWithCmd(const wchar_t *application, const wchar_t *command, HANDLE *process)
 	{
 		return RunAppWithRedirection(application, command, NULL, NULL, NULL,true,process);
@@ -408,14 +426,12 @@ namespace base	{
 	{
 		OSVERSIONINFOW osvi;
 		osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
 		::GetVersionExW(&osvi);
 		if(osvi.dwPlatformId == VER_PLATFORM_WIN32_NT)
 		{
 			::SetProcessWorkingSetSize(GetCurrentProcess(), (SIZE_T)-1, (SIZE_T)-1);
 			return true;
 		}
-
 		return false;
 	}
 
@@ -424,12 +440,9 @@ namespace base	{
 		assert(application);
 		if (application == NULL)
 			return false;
-
 		HANDLE hMutex = ::CreateMutexW(NULL, TRUE, application);
-
 		if (hMutex == NULL)
 			return false;
-
 		if (::GetLastError() == ERROR_ALREADY_EXISTS)
 		{
 			::CloseHandle(hMutex);
@@ -477,7 +490,6 @@ namespace base	{
 			ADAPTER_STATUS adapt;  
 			NAME_BUFFER NameBuffer[30];  
 		}ASTAT, *PASTAT;
-
 		ASTAT     Adapter;  
 		NCB       Ncb;  
 		UCHAR     uRetCode;  
@@ -734,6 +746,55 @@ namespace base	{
 		return bIsWow64;    
 	}
 
+	CAtlString GetProcessPath(DWORD th32ProcessID)
+	{
+		CAtlString retName;
+		HANDLE help32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, th32ProcessID);  
+		if(help32Snapshot != INVALID_HANDLE_VALUE)
+		{
+			MODULEENTRY32 me32;
+			me32.dwSize  =sizeof(MODULEENTRY32);
+			if(Module32First(toolHelp32Snapshot,&me32))
+				retName = me32.szExePath;
+			::CloseHandle(help32Snapshot);
+		}
+		if(!retName.IsEmpty())
+			return retName;
+		HANDLE hProc = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,th32ProcessID);
+		if(hProc)
+		{
+			TCHAR chPath[MAX_PATH+1] = { 0 };
+			::GetModuleFileNameEx(hTmp,NULL,chPath,MAX_PATH);
+			retName = chPath;
+			::CloseHandle(hProc);
+		}
+		return retName;
+	}
+
+	CAtlString GetRunProcessPath(const CAtlString& szProcessName)
+	{
+		CAtlString ret;
+		PROCESSENTRY32 processEntry32; 
+		HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);  
+		if(((int)toolHelp32Snapshot) != -1)  
+		{  
+			processEntry32.dwSize = sizeof(processEntry32);  
+			if (Process32First(toolHelp32Snapshot, &processEntry32))  
+			{  
+				do  
+				{
+					if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
+					{
+						ret = GetProcessPath(processEntry32.th32ProcessID);
+						break;
+					}  
+				}while (Process32Next(toolHelp32Snapshot, &processEntry32));  
+			}  
+			CloseHandle(toolHelp32Snapshot);  
+		}
+		return ret; 
+	}
+
 	HANDLE FindProcessByPath(const CAtlString& szPath)
 	{
 		HANDLE handle=NULL;
@@ -890,7 +951,7 @@ namespace base	{
 		RegCloseKey(hKey);
 		return ret;
 	}
-	Software DumpInstallSoftware()
+	Software DumpInstallSoftware(bool bMachine)
 	{
 		Software ret;
 		HRESULT hr=0;
@@ -898,7 +959,10 @@ namespace base	{
 		HKEY hKey;
 		REGSAM samDesired = KEY_READ;
 		DWORD cSubKeys = 0;
-		::RegOpenKeyEx(HKEY_LOCAL_MACHINE, uninstall, 0, samDesired, &hKey);
+		if(bMachine)
+			::RegOpenKeyEx(HKEY_LOCAL_MACHINE, uninstall, 0, samDesired, &hKey);
+		else
+			::RegOpenKeyEx(HKEY_CURRENT_USER, uninstall, 0, samDesired, &hKey);
 		::RegQueryInfoKey(hKey,NULL, NULL,NULL,&cSubKeys,NULL, NULL,NULL,NULL, NULL, NULL,NULL);
 		for(DWORD i=0;i<cSubKeys;i++)
 		{
