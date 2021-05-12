@@ -265,8 +265,8 @@ namespace HttpService {
 			<< "\r\n";
 		mg_printf(nc, "%s", ss.str().c_str());
 		mg_send(nc,result.response.c_str(),result.response.size());
-		if(gRunParam.GetMG())
-			mg_serve_http(nc, hm, gRunParam.GetMG()->s_http_server_opts); /* Serve static content */
+		//if(gRunParam.GetMG())
+		//	mg_serve_http(nc, hm, gRunParam.GetMG()->s_http_server_opts); /* Serve static content */
 	}
 	std::string MakeDefaultJson(bool ok)
 	{
@@ -309,8 +309,8 @@ namespace HttpService {
 						result.response = MakeDefaultJson(false);
 					ResponseContent(nc,hm,result,origin);
 				}
-				if(gRunParam.GetMG())
-					mg_serve_http(nc, hm, gRunParam.GetMG()->s_http_server_opts);
+				//if(gRunParam.GetMG())
+				//	mg_serve_http(nc, hm, gRunParam.GetMG()->s_http_server_opts);
 			}
 			break;
 		default:
