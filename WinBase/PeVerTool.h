@@ -3,7 +3,6 @@
 #include <vector>
 #include <atlstr.h>
 namespace base{
-
 	class PeInfoVal
 	{
 	public:
@@ -46,9 +45,25 @@ namespace base{
 		int code_page_;
 		VS_FIXEDFILEINFO fixed_file_info_;
 	};
+	
+	typedef struct SignInfo
+	{
+		CAtlString author;	//签名者姓名
+		CAtlString timestamp;	//签名时间
+		CAtlString programName;
+		CAtlString publisherLink;
+		CAtlString moreInfoLink;
+	}SIGN_INFO;
+	
 	PeInfoVal GetPeInfo(PCTSTR pcszFileName);
 	CAtlString GetSelfVersion(HMODULE hModule=NULL);
 	int CompareVersion(LPCTSTR a,LPCTSTR b);
-	//获取两个版本号差值
-	int GetVerDiff(LPCTSTR a,LPCTSTR b);
+	
+	/*
+		@input
+			pcszFileName 输入已签名文件完整路径
+		@return
+			SIGN_INFO 读取签名信息
+	*/
+	SIGN_INFO GetSoftSign(PCTSTR pcszFileName);
 }
