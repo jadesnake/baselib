@@ -63,6 +63,9 @@ namespace curl
 		//设置agent
 		void	SetAgent(const CAtlString &val);
 		//添加参数
+		void	AddFile(const CAtlString  &szName,const CAtlString  &szFileName,const CAtlString &szValue);
+		void	AddFile(const std::string &szName,const std::string &szFileName,const std::string& szValue);
+
 		void	AddBoundary(const CAtlString &szName,const CAtlString &szValue,ParamAttr dwParamAttr=ParamNormal);
 		void	AddBoundary(const std::string& ,const std::string& szValue, ParamAttr dwParamAttr=ParamNormal);
 		//清除参数
@@ -162,31 +165,3 @@ namespace curl
 		Chunk m_nowChunk;
  	};
 }
-
-//PeVerTool
-template<class PeVerTool>
-class HttpClientV : public curl::CHttpClient
-{
-public:
-	HttpClientV()
-	{
-		//读取版本号原始文件名等信息
-		HRSRC hsrc = FindResource(0, MAKEINTRESOURCE(VS_VERSION_INFO), RT_VERSION);
-		if(hsrc)
-		{
-			HGLOBAL hgbl = LoadResource(0,hsrc);
-			PeVerTool peTool;
-			peTool.Set(LockResource(hgbl));
-			CAtlString version = peTool.product_version();
-			CAtlString orgName = peTool.original_filename();
-			UnlockResource(hgbl);
-			orgName.Replace(L".exe",L"");
-			version.Remove(' ');
-			version.Replace(',','.');
-			CAtlString strAgent;
-			strAgent.Format(_T("%s:%s"),orgName.GetString(),version.GetString());
-			SetAgent(strAgent);
-			AddHeader(orgName,version);
-		}
-	}
-};

@@ -59,8 +59,11 @@ namespace CustomUI
 		void Init();
 		long SubCtrSizeForRaw();
 		void GetValidCtrForRaw(std::vector<NEED_SIZE> &out,SIZE szBlank);
+		SIZE InsideEstimateSize(SIZE szAvailable);
 	private:
 		//记录每个控件原始大小
 		std::map<DuiLib::CControlUI*,SIZE> mCtrRawSize;
+		SIZE szUpSize;
+		DuiLib::CDuiRect rcNowList;
 	};
 }

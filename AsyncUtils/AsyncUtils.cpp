@@ -72,6 +72,7 @@ namespace base
 		m_run  = NULL;
 		m_win    = win;
 		m_curStats = UNSTART;
+		memset(m_timer,0,sizeof(m_timer));
 		Back2Front::Get()->pushStack(this);
 	}
 	BackLogicBase::~BackLogicBase(void)
@@ -86,6 +87,15 @@ namespace base
 			::CloseHandle(m_run);
 			m_run = NULL;
 		}
+		int nNum = (sizeof(m_timer)/sizeof(HANDLE));
+		for(int n=0;n<nNum;n++)
+		{
+			if(m_timer[n]==0)
+			{
+				 ::CloseHandle(m_timer[n]);
+				 m_timer[n] = 0;
+			}
+		}
 	}
 	void BackLogicBase::resetWin(HWND win)
 	{
@@ -97,11 +107,75 @@ namespace base
 		{
 			m_quit = ::CreateEvent(NULL,FALSE,FALSE,NULL);
 			m_run = ::CreateEvent(NULL,FALSE,FALSE,NULL);
-			//m_thread = ::CreateThread(NULL,0,(LPTHREAD_START_ROUTINE),0,NULL);
-			m_thread = (HANDLE)_beginthreadex(NULL,0,&BackLogicBase::ThreadProc,this,0,&m_id);
+ 			m_thread = (HANDLE)_beginthreadex(NULL,0,&BackLogicBase::ThreadProc,this,0,&m_id);
 		}
 		::SetEvent(m_run);
 	}
+	int BackLogicBase::addTimer(UINT nInterval,bool bImmediately)
+	{
+		if(m_thread)
+			return 0;
+		int idx=-1;
+		int nNum = (sizeof(m_timer)/sizeof(HANDLE));
+		for(int n=0;n<nNum;n++)
+		{
+			if(m_timer[n]==0)
+			{
+				idx = n;
+				break;
+			}
+		}
+		if(idx==-1)
+			return 0;		
+		HANDLE hEV = ::CreateWaitableTimer(NULL,FALSE,NULL);
+		LARGE_INTEGER liDueTime;
+		liDueTime.QuadPart = -10000*(__int64)nInterval;
+		BOOL bRet = FALSE;
+		if(bImmediately)
+			bRet = ::SetWaitableTimer(hEV,NULL, nInterval,NULL,NULL,TRUE);
+		else
+			bRet = ::SetWaitableTimer(hEV,&liDueTime, nInterval,NULL,NULL,TRUE);
+		if (!bRet)
+		{
+			CloseHandle(hEV);
+			return 0;
+		}
+		m_timer[idx] = hEV;
+		m_timerVal[idx] = TimerVal(liDueTime,nInterval);
+		return (idx+1);
+	}
+	bool BackLogicBase::stopTimer(int i)
+	{
+		int nNum = (sizeof(m_timer)/sizeof(HANDLE));
+		if(i>nNum)
+			return false;
+		int idx = 0;
+		if(i>=1)
+			idx = i-1;
+		BOOL bRet = FALSE;
+		if(m_timer[idx])
+		{
+			bRet = ::CancelWaitableTimer(m_timer[idx]);
+			return true;
+		}
+		return false;
+	}
+	bool BackLogicBase::resumTimer(int i)
+	{
+		int nNum = (sizeof(m_timer)/sizeof(HANDLE));
+		if(i>nNum)
+			return false;
+		int idx = 0;
+		if(i>=1)
+			idx = i-1;
+		BOOL bRet = FALSE;
+		if(m_timer[idx])
+		{
+ 			bRet = ::SetWaitableTimer(m_timer[idx],&m_timerVal[idx].dueTime, m_timerVal[idx].interval,NULL,NULL,TRUE);
+			return true;
+		}
+		return false;
+ 	}
 	void BackLogicBase::stop()
 	{
 		if(m_thread)
@@ -153,19 +227,39 @@ namespace base
 	unsigned int BackLogicBase::ThreadProc(void* p1)
 	{
 		BackLogicBase *pT = reinterpret_cast<BackLogicBase*>(p1);
-		HANDLE events[10]={pT->m_quit,pT->m_run};
+		int nCountEv = 0;
+		HANDLE events[128]={0};
+		events[0] = pT->m_quit;
+		nCountEv += 1;
+		int nNum = (sizeof(pT->m_timer)/sizeof(HANDLE));
+		int idx  = 0;
+		for(int n=0;n<nNum;n++)
+		{
+			if(pT->m_timer[n])
+			{
+				events[nCountEv] = pT->m_timer[n];
+				nCountEv += 1;
+			}
+		}
+		events[nCountEv] = pT->m_run;
+		nCountEv += 1;
 		::CoInitialize(NULL);
 		::OleInitialize(NULL);
 		while(1)
 		{
 			bool bPost=false;
-			DWORD dwWait = WaitForMultipleObjects(2,events,FALSE,INFINITE);
+			DWORD dwWait = WaitForMultipleObjects(nCountEv,events,FALSE,INFINITE);
 			if(dwWait==WAIT_OBJECT_0)
-			{
 				break;
-			}
+			if(events[dwWait]==pT->m_run || events[dwWait]==pT->m_quit)
+				idx = 0;
+			else
+				idx = dwWait;
 			pT->UpdateStatus(WORKING);
-			bPost = pT->Run();
+			if(idx==0)
+				bPost = pT->Run();
+			else
+				bPost = pT->Timer(idx);
 			pT->UpdateStatus(STOP);
 			if( bPost && pT->m_win)
 				Back2Front::Get()->postFront(pT->m_win,LogicEvent<>::UM_LOGIC,pT);

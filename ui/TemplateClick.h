@@ -279,10 +279,9 @@ namespace CustomUI
 			{
 				if( (m_uButtonState & UISTATE_CAPTURED) != 0 ) 
 				{
+					if( ::PtInRect(&m_rcItem, event.ptMouse) ) Activate();				
 					m_uButtonState &= ~(UISTATE_PUSHED | UISTATE_CAPTURED);
 					Invalidate();
-					if( ::PtInRect(&m_rcItem, event.ptMouse) )
-						Activate();
 				}
 				return;
 			}
@@ -301,7 +300,10 @@ namespace CustomUI
 					m_uButtonState |= UISTATE_HOT;
 					Invalidate();
 				}
-				// return;
+				else
+				{
+					::SetCursor(::LoadCursor(NULL, MAKEINTRESOURCE(IDC_ARROW)));
+				}
 			}
 			if( event.Type == DuiLib::UIEVENT_MOUSELEAVE )
 			{
@@ -309,11 +311,11 @@ namespace CustomUI
 					m_uButtonState &= ~UISTATE_HOT;
 					Invalidate();
 				}
-				// return;
 			}
 			if( event.Type == DuiLib::UIEVENT_SETCURSOR )
 			{
-				::SetCursor(::LoadCursor(NULL, MAKEINTRESOURCE(IDC_HAND)));
+				if(IsEnabled())
+					::SetCursor(::LoadCursor(NULL, MAKEINTRESOURCE(IDC_HAND)));
 				return;
 			}
 			Control::DoEvent(event);
@@ -488,12 +490,13 @@ Label_ForeImage:
 			ret = Control::EstimateSize(szAvailable);
 			long sy = szAvailable.cx - rcText.right;
 			if( sy==0||sy<0 )
+			{
 				ret.cx += m_Correct;
+			}
 			else if( sy<abs(m_Correct) )
+			{
 				ret.cx += sy+m_Correct;
-			if( (rcText.right-rcText.left)<ret.cx )
-				ret.cx = rcText.right-rcText.left;
-			ret.cx += Control::GetTextPadding().left + Control::GetTextPadding().right;
+			}
 			return ret;
 		}
 		void PaintText(HDC hDC)

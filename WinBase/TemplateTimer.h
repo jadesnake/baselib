@@ -42,7 +42,8 @@ public:
     {
 		//fixed by jiayh
 		//If this parameter is INVALID_HANDLE_VALUE, the function waits for any running timer callback functions to complete before returning.
-        DeleteTimerQueueTimer( NULL, m_hTimer, INVALID_HANDLE_VALUE );
+        if(m_hTimer)
+			DeleteTimerQueueTimer( NULL, m_hTimer, INVALID_HANDLE_VALUE );
         m_hTimer = NULL ;
     }
 	//定时器事件
@@ -113,6 +114,7 @@ private:
     TimedFunction m_pTimedFunction;
 };
 
+template <class T>
 HANDLE CreateWaitTimer(DWORD dwInterval)
 {
 	HANDLE hRet = ::CreateWaitableTimer(NULL,FALSE,NULL);

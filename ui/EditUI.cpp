@@ -95,6 +95,7 @@ namespace CustomUI
 				this->Invalidate();
 			}
 		}
+
 		__super::DoEvent(event);
 	}
 	void EditUI::PaintBorder(HDC hDC)
@@ -160,6 +161,14 @@ namespace CustomUI
 	{
 		HRESULT hr = 0;
 		EditUI *pT = const_cast<EditUI*>(this);
+		//OutputDebugStringA("\nEditUI\n");
+		//CAtlString msgDBG;
+		//msgDBG.Format(_T("0x%X"),msg);
+		//OutputDebugString(msgDBG);
+ 		if(pT->GetManager()&&this!=pT->GetManager()->GetFocus())
+		{
+			return __super::TxSendMessage(msg,wparam,lparam,plresult);
+		}
 		if(msg==WM_CUT || msg==WM_PASTE)
 		{
 			hr = __super::TxSendMessage(msg,wparam,lparam,plresult);
@@ -196,7 +205,7 @@ namespace CustomUI
 				return hr;
 			}
 		}
-		if( msg==WM_CHAR||msg==WM_IME_ENDCOMPOSITION)
+		if( msg==WM_CHAR )
 		{
 			bool bInput = true;
 			{

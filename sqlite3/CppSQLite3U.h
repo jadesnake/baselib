@@ -8,6 +8,7 @@
 // CppSQLite3U.h : header file
 //
 #include "sqlite3.h"
+#include "SQLiteTool.h"
 /////////////////////////////////////////////////////////////////////////////
 #define SQL_MAXSIZE    2048
 
@@ -23,8 +24,7 @@ class CppSQLite3StatementU;
 class CppSQLite3ExceptionU
 {
 public:
-
-    CppSQLite3ExceptionU(const int nErrCode,
+    CppSQLite3ExceptionU(CSQLiteTool *sqlDB,const int nErrCode,
 					    LPTSTR  szErrMess,
 					    bool bDeleteMsg=true);
 
@@ -49,8 +49,7 @@ class CppSQLite3DBU
 {
 // Construction
 public:
-	CppSQLite3DBU();
-
+	explicit CppSQLite3DBU(CSQLiteTool *sqlTool);
 // Operations
 public:
     virtual ~CppSQLite3DBU();
@@ -78,42 +77,38 @@ public:
     sqlite_int64 lastRowId();
     
     void setBusyTimeout(int nMillisecs);
-
-    static const char* SQLiteVersion() { return SQLITE_VERSION; }
-
 	bool finalize();
 
-	//释放所有资源
-	static void Release();
+	bool backup(const CppSQLite3DBU &from,LPCTSTR dbNM);
+
+	inline CSQLiteTool* GetSqlTool(){
+		return mSqlTool;
+	}
 protected:
 	void GetLastMsg();
 	void InitParam();
 private:
-
     CppSQLite3DBU(const CppSQLite3DBU& db);
     CppSQLite3DBU& operator=(const CppSQLite3DBU& db);
-
     sqlite3_stmt* compile(LPCTSTR szSQL);
-
-    bool checkDB();
 public:
     sqlite3* mpDB;
     int mnBusyTimeoutMs;
 	sqlite3_stmt* mpVM;
 	CAtlString lastMsg;
 	bool autoShutDown;
+	bool mynewtool;
+private:
+	CSQLiteTool* mSqlTool;
 };
 /////////////////////////////////////////////////////////////////////////////
 
 class CppSQLite3StatementU
 {
 public:
-
-	CppSQLite3StatementU();
-
+	explicit CppSQLite3StatementU(CppSQLite3DBU *sqlDB);
+	explicit CppSQLite3StatementU(CppSQLite3DBU *sqlDB,sqlite3_stmt* pVM);
 	CppSQLite3StatementU(const CppSQLite3StatementU& rStatement);
-
-	CppSQLite3StatementU(sqlite3* pDB, sqlite3_stmt* pVM);
 
 	virtual ~CppSQLite3StatementU();
 
@@ -128,30 +123,26 @@ public:
 	bool bind(int nParam, const double dwValue);
 	bool bind(int nParam, const unsigned char* blobValue, int nLen);
 	bool bindNull(int nParam);
-
 	bool reset();
-
 	bool finalize();
-
 private:
-
 	bool checkDB();
 	bool checkVM();
-
 	sqlite3* mpDB;
 	sqlite3_stmt* mpVM;
 	CAtlString lastMsg;
+	CppSQLite3DBU *mSqliteDB;
 };
 /////////////////////  CppSQLite3QueryU  //////////////////////////////////////////////////
 class CppSQLite3QueryU
 {
 public:
 
-	CppSQLite3QueryU();
+	CppSQLite3QueryU(CppSQLite3DBU *sqlDB);
 
 	CppSQLite3QueryU(const CppSQLite3QueryU& rQuery);
 
-	CppSQLite3QueryU(sqlite3* pDB,
+	CppSQLite3QueryU(CppSQLite3DBU *sqlDB,
 		sqlite3_stmt* pVM,
 		bool bEof,
 		bool bOwnVM=true);
@@ -183,6 +174,9 @@ public:
 	LPCTSTR getStringField(int nField, LPCTSTR szNullValue=_T(""));
 	LPCTSTR getStringField(LPCTSTR szField, LPCTSTR szNullValue=_T(""));
 
+	LPCSTR getAsciiFieldIdx(int nField);
+	LPCSTR getAsciiStrField(LPCTSTR szField, LPCSTR szNullValue="");
+
 	const unsigned char* getBlobField(int nField, int& nLen);
 	const unsigned char* getBlobField(LPCTSTR szField, int& nLen);
 
@@ -192,11 +186,10 @@ public:
 	bool eof();
 	void nextRow();
 	bool finalize();
-
 private:
-
 	bool checkVM();
-
+private:
+	CppSQLite3DBU *mSqlDB;
 	sqlite3* mpDB;
 	sqlite3_stmt* mpVM;
 	bool mbEof;

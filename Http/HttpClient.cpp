@@ -429,6 +429,19 @@ namespace curl {
 	{
 		m_params.insert(std::make_pair(szName, szValue));
 	}
+	void	CHttpClient::AddFile(const CAtlString  &szName,const CAtlString  &szFileName,const CAtlString &szValue)
+	{
+		AddFile((char*)CT2CA(szName,CP_UTF8),(char*)CT2CA(szFileName,CP_UTF8),(char*)CT2CA(szValue));
+	}
+	void	CHttpClient::AddFile(const std::string &szName,const std::string &szFileName,const std::string& szValue)
+	{
+		CURLFORMcode code = CURL_FORMADD_OK;
+		code = curl_formadd(&m_postBoundary, &m_lastBoundary,
+			CURLFORM_COPYNAME, szName.c_str(),
+			CURLFORM_FILE, szValue.c_str(),
+			CURLFORM_FILENAME, szFileName.c_str(),
+			CURLFORM_END);
+	}
 	void	CHttpClient::SetEncodeUrl(bool e)
 	{
 		m_bEncodeUrl = e;

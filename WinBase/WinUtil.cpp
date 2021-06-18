@@ -825,6 +825,7 @@ namespace base	{
 		}
 		return handle;
 	}
+
 	bool KillProcess(const CAtlString& szProcessName)
 	{
 		bool bRet = false;
@@ -879,7 +880,7 @@ namespace base	{
 		}
 		return bRet;
 	}
-	bool IsExistProcess(const CAtlString& szProcessName)
+	bool IsExistProcess(const CAtlString& szProcessName,HANDLE *process)
 	{
 		bool bRet = false;
 		PROCESSENTRY32 processEntry32;   
@@ -894,6 +895,9 @@ namespace base	{
 					if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
 					{
 						bRet = true;
+						HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,processEntry32.th32ProcessID);
+						if(process)
+							*process = handle;
 						break;
 					}  
 				}while (Process32Next(toolHelp32Snapshot, &processEntry32));  
@@ -902,6 +906,7 @@ namespace base	{
 		}
 		return bRet; 
 	}
+
 
 	void Software::push(const Software::DATA& d)
 	{

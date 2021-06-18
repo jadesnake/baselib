@@ -7,16 +7,11 @@
 #include "ScannerEdit.h"
 #include "OptionUI.h"
 #include "TemplateClick.h"
-#include "HintEditUI.h"
 namespace CustomUI
 {
 	template<class T>
 	DuiLib::CControlUI* CreateCustomUI(LPCTSTR pstrClass,T *base)
 	{
-		if(_tcscmp(pstrClass,_T("CustomUI::HintEdit"))==0)
-		{
-			return new CustomUI::HintEditUI;
-		}
 		if(_tcscmp(pstrClass,_T("CustomUI::Edit"))==0)
 		{
 			return new CustomUI::EditUI();
@@ -63,6 +58,7 @@ namespace CustomUI
 			return base->CreateControl(pstrClass);
 		return NULL;
 	}
+	std::vector<HWND> GetAllChildren(HWND win);
 	//ÊôÐÔ½Ó¿Ú
 	template<class DuiWinBase>
 	class WinBaseResT : public DuiWinBase

@@ -114,6 +114,31 @@ namespace base
 		_ftime(&t1);
 		return (t1.time * 1000 + t1.millitm);
 	}
+	bool Calendar::MinusMonths(int v)
+	{
+		int nY = 0;	//翻的年数
+		int nM = 0;	//翻的月数
+		if(v>=12)
+		{
+			nY = v/12;
+			nM = v%12;
+		}
+		else
+			nM = v;
+		int nTarY = GetYear() - 1;
+		int nTarM = GetMonth() + 12 - nM;
+		if(nTarM > 12)
+		{
+			nTarY += 1;
+			nTarM -= 12;
+		}
+		nTarY -= nY;
+		if( nTarY < 1900 )
+			return false;
+		base::Calendar canlendarTmp(nTarY,nTarM,GetDay(),GetHour(),GetMinute(),GetSecond());
+		*this = canlendarTmp;
+		return true;
+	}
 	bool Calendar::MinusDays(int v)
 	{
 		*this -= ATL::CTimeSpan(v,0,0,0);

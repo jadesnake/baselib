@@ -342,6 +342,7 @@ namespace CustomUI
 	void CListHeaderUI::Init()
 	{
 		__super::Init();
+		memset(&szUpSize,0,sizeof(SIZE));
 		for(int n=0;n<GetCount();n++)
 		{
 			CustomUI::ListHeaderItemUI *headItem = base::SafeConvert<CustomUI::ListHeaderItemUI>(GetItemAt(n),_T("CustomUI::ListHeaderItemUI"));
@@ -389,7 +390,19 @@ namespace CustomUI
 	}
 	SIZE CListHeaderUI::EstimateSize(SIZE szAvailable)
 	{
-		SIZE  sz = __super::EstimateSize(szAvailable);
+		if(!::EqualRect(&rcNowList,&GetListUI()->GetPos()))
+		{
+			rcNowList = GetListUI()->GetPos();
+			if(GetHorizontalScrollBar()&&GetHorizontalScrollBar()->IsVisible())
+				GetHorizontalScrollBar()->SetScrollPos(0);
+			GetListUI()->NeedUpdate();
+			return InsideEstimateSize(szAvailable);
+		}
+		return __super::EstimateSize(szAvailable);
+	}
+	SIZE CListHeaderUI::InsideEstimateSize(SIZE szAvailable)
+	{
+ 		SIZE  sz = __super::EstimateSize(szAvailable);
 		//记录每个控件需要的size
 		if(mCtrRawSize.size()==0)
 		{
@@ -405,7 +418,6 @@ namespace CustomUI
 			}
 			return sz;
 		}
-
 		long remainX = szAvailable.cx - sz.cx;
 		if(remainX==0)	return sz;
 		long rawX = SubCtrSizeForRaw();
@@ -462,6 +474,10 @@ namespace CustomUI
 		}
 		else
 		{
+			if(remainX<0)
+			{
+				sz.cx -= remainX; 
+			}
 			for(int n=0;n<adjCtr.size() && remainX<0 && nPerX;n++)
 			{
 				NEED_SIZE *one = &adjCtr.at(n);
@@ -479,7 +495,7 @@ namespace CustomUI
 					one->sz.cx = szRaw.cx;
 				one->ui->SetFixedWidth(one->sz.cx);
 			}
-		}
+		}	
 		return sz;
 	}
 }

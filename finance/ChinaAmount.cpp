@@ -1,50 +1,13 @@
 #include "stdafx.h"
 #include "ChinaAmount.h"
 
-namespace ChinaAmount
+namespace base
 {
-	int Char2Num(TCHAR num)
+	bool ChinaAmount::CapitalRMB(const CAtlString &inRmb,CAtlString &out)
 	{
-		if(num>='0' && num<='9')
-		{
-			return (num-'0');
-		}
-		return -1;
-	}
-	CAtlString CapitalNumber(const CAtlString &inNum)
-	{
-		CAtlString out;
-		static TCHAR CAPITAL_NUM[]=_T("ÁãÒ»¶þÈýËÄÎåÁùÆß°Ë¾ÅÊ®");
-		CAtlString tmp;
-		for(int n=0;n<inNum.GetLength();n++)
-		{
-			int nW = Char2Num(inNum[n]);
-			if(nW<0)
-			{
-				return out;
-			}
-			tmp += CAPITAL_NUM[nW];
-			if(tmp.GetLength()==2)
-			{
-				bool bNextLoop = false;
-				if(tmp==_T("Ò»Áã"))
-				{
-					out.SetAt(out.GetLength()-1,CAPITAL_NUM[10]);
-					bNextLoop = true;
-				}
-				tmp.Empty();
-				if(bNextLoop)
-					continue;
-			}
-			out += CAPITAL_NUM[nW];
-		}
-		return out;
-	}
-	bool CapitalRMB(const CAtlString &inRmb,CAtlString &out)
-	{
-		static TCHAR CHINA_NUM[]=_T("ÁãÒ¼·¡ÈþËÁÎéÂ½Æâ°Æ¾Á");
+		static TCHAR CAPITAL_NUM[]=_T("ÁãÒ¼·¡ÈþËÁÎéÂ½Æâ°Æ¾Á");
 		//static TCHAR CAPITAL_UNIT[]=_T("·Ö½ÇÔªÊ°°ÛÇªÍòÒÚ");
-
+		
 		static TCHAR radices[] = _T(" Ê°°ÛÇª");
 		static TCHAR bigRadices[] = _T(" ÍòÒÚ");
 		static TCHAR decimals[] = _T("·Ö½Ç");
@@ -94,7 +57,7 @@ namespace ChinaAmount
 		{
 			int price = decimal[nNum] - _T('0');
 			if(price==0)	continue;	//Ìø¹ý0
-			TCHAR capital = CHINA_NUM[price];
+			TCHAR capital = CAPITAL_NUM[price];
 			TCHAR unit = decimals[nUnit];
 			tmp2 += capital;
 			tmp2 += unit;
@@ -115,10 +78,10 @@ namespace ChinaAmount
 			{ 
 				if (zeroCount > 0) 
 				{ 
-					tmp1 += CHINA_NUM[0]; 
+					tmp1 += CAPITAL_NUM[0]; 
 				} 
 				zeroCount = 0; 
-				tmp1 += CHINA_NUM[ _ttoi(d) ];
+				tmp1 += CAPITAL_NUM[ _ttoi(d) ];
 				tmp1 += radices[modulus]; 
 			} 
 			if (modulus==0 && zeroCount < 4) 
@@ -136,22 +99,4 @@ namespace ChinaAmount
 		out = tmp1 + tmp2;
 		return true;
 	}
-	UINT Unit2Number(const CAtlString& unit)
-	{
-		UINT ret = 1;
-		if(unit==_T("°Ù"))
-			ret = 100;
-		else if(unit==_T("Ç§"))
-			ret = 1000;
-		else if(unit==_T("Íò"))
-			ret = 10000;
-		else if(unit==_T("Ê®Íò"))
-			ret = 100000;
-		else if(unit==_T("°ÙÍò"))
-			ret = 1000000;
-		else if(unit==_T("Ç§Íò"))
-			ret = 10000000;
-		return ret;
-	}
-
 }

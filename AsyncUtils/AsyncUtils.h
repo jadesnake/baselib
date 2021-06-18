@@ -4,6 +4,7 @@
 #include "LockGuard.h"
 #include "../baseX.h"
 #include "../SingleCpp.h"
+#include <atlutil.h>
 
 namespace base{
 
@@ -81,10 +82,27 @@ namespace base{
 			UNSTART=3,
 			STOP
 		};
+		class TimerVal
+		{
+		public:
+			TimerVal(){
+
+			}
+			TimerVal(LARGE_INTEGER a,UINT b){
+				dueTime = a;
+				interval= b;
+			}
+			LARGE_INTEGER dueTime;
+			UINT interval;
+		};
 		BackLogicBase(HWND win);
 		virtual ~BackLogicBase(void);
 		void resetWin(HWND win);
-		virtual void start();
+		void start();
+		virtual int addTimer(UINT nInterval,   // 以毫秒为单位
+							 bool bImmediately = false);
+		virtual bool stopTimer(int i);
+		virtual bool resumTimer(int i);
 		virtual void close(DWORD waitTM=3000);
 		virtual void stop();
 		virtual Status  getStatus();
@@ -101,12 +119,15 @@ namespace base{
 		void UpdateStatus(BackLogicBase::Status v);
 	protected:
 		virtual bool Run() = 0;
+		virtual bool Timer(int i){ return false; };
 		virtual void Done() = 0;
 	protected:
 		HWND	m_win;
 		HANDLE	m_thread;
 		HANDLE  m_quit;
 		HANDLE  m_run;
+		HANDLE  m_timer[32];
+		std::map<int,TimerVal> m_timerVal;
 		CAtlString m_error;
 		CLock   m_lockStatus;
 		CLock   m_lockError;
@@ -120,7 +141,7 @@ namespace base{
 		CTaskJob();
 		virtual ~CTaskJob();
 	public:
-		virtual void Run()=0;
+		virtual void Run(int i=0)=0;
 		void SetTag(int ntag);
 		void SetHwnd(HWND hWnd);
 		void SetPid(LPCTSTR pszPid);

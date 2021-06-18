@@ -6,11 +6,10 @@
 class CSQLiteTool
 {
 public:
-	GarboSingle(CSQLiteTool);
-public:
-	int Initialize();
+	int Initialize(const char* usrDll);
+	int Initialize( CSQLiteTool *sqltool);
 	int Shutdown();
-
+	bool IsLoaded();
 	//打开数据库
 	int  OpenDB16( const void *filename, sqlite3 **ppDb );
 
@@ -172,8 +171,9 @@ public:
 	//添加用户 utf-8
 	int UserAdd(sqlite3 * pDB,const char* nm,const char* pwd,bool isAdmin);
 	int UserLogin(sqlite3 * pDB,const char* nm,const char* pwd);
-	//释放资源
-	void Release();
+	//
+	bool Backup(sqlite3 *pFrom,const char* nmFrom,sqlite3 *pTo,const char* nmTo);
 private:
 	base::DLL	dll;
+	CString		dllFile;
 };

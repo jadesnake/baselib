@@ -34,7 +34,7 @@ namespace base
 
 	CAtlString GetRunProcessPath(const CAtlString& szProcessName);
 	HANDLE FindProcessByPath(const CAtlString& szPath);
-	bool IsExistProcess(const CAtlString& szProcessName);
+	bool IsExistProcess(const CAtlString& szProcessName,HANDLE *process=NULL);
 	bool KillProcess(const CAtlString& szProcessName);
 
 	bool RunApp(const wchar_t *application, HANDLE *process = NULL);

@@ -101,33 +101,57 @@ typedef void (WINAPIV* pFreeTable)(char **result);
 
 typedef void (WINAPIV* pInterrupt)(sqlite3* pDb);
 
+typedef sqlite3_backup* (WINAPI* pBackup_init)(sqlite3 *pDest,const char *zDestName,sqlite3 *pSource,const char *zSourceName);
+typedef int (WINAPI* pBackup_step)(sqlite3_backup *p, int nPage);
+typedef int (WINAPI* pBackup_finish)(sqlite3_backup *p);
+
 #define SQLITE_FILE_NAME _T("sqlite3.dll")
 
-CSQLiteTool::CSQLiteTool(void)
-{
-	CString strFilename=GetDllPath(SQLITE_FILE_NAME)+SQLITE_FILE_NAME;
-	dll.Load(strFilename);
-}
 
-CSQLiteTool::~CSQLiteTool(void)
+int CSQLiteTool::Initialize( CSQLiteTool *sqltool)
 {
-	
+	return Initialize(CT2CA(sqltool->dllFile));
 }
-
-//ÊÍ·Å×ÊÔ´
-void CSQLiteTool::Release()
+bool CSQLiteTool::IsLoaded()
 {
-	
+	if(dllFile.IsEmpty())
+		return false;
+	return true;
 }
-int CSQLiteTool::Initialize()
+int CSQLiteTool::Initialize(const char* usrDll)
 {
+	dllFile = CA2CT(usrDll);
+	if(dllFile.IsEmpty())
+		dllFile = GetDllPath(SQLITE_FILE_NAME)+SQLITE_FILE_NAME;
+	else
+		dllFile = usrDll;
+	dll.Load(dllFile);
+	
 	pInitialize pFunction = dll.FindFunction<pInitialize>("sqlite3_initialize");
 	if(pFunction)
 	{
 		return pFunction();
 	}
 	return -1;
-
+}
+bool CSQLiteTool::Backup(sqlite3 *pFrom,const char* nmFrom,sqlite3 *pTo,const char* nmTo)
+{
+	pBackup_init pFunInit = dll.FindFunction<pBackup_init>("sqlite3_backup_init");
+	pBackup_step pFunStep = dll.FindFunction<pBackup_step>("sqlite3_backup_step");
+	pBackup_finish pFunFinish = dll.FindFunction<pBackup_finish>("sqlite3_backup_finish");
+	if(pFunInit && pFunStep && pFunFinish)
+	{
+		sqlite3_backup *pBackup = pFunInit(pTo,nmTo,pFrom,nmFrom);
+		if(pBackup)
+		{
+			pFunStep(pBackup,-1);
+			pFunFinish(pBackup);
+		}
+		int code = GetErrCode(pTo);  
+		if(code==SQLITE_OK)
+			return true;
+	}
+	return false;
 }
 int CSQLiteTool::Shutdown()
 {

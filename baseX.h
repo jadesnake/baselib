@@ -163,8 +163,10 @@ namespace base{
 			T* pTemp = p;
 			if (pTemp)
 			{
-				p = NULL;
-				pTemp->RelRef();
+				if(0==pTemp->RelRef())
+				{
+					p = NULL;
+				}				
 			}
 		}
 		// Attach to an existing interface (does not AddRef)
@@ -225,7 +227,7 @@ namespace base{
 	class DLL
 	{
 	public:
-		DLL() : m_dwError(0),m_hModule(NULL)
+		DLL() : m_dwError(0)
 		{
 
 		}
@@ -243,7 +245,6 @@ namespace base{
 			::PathRemoveFileSpec(chMax);	//Éú³ÉdllÂ·¾¶
 			::GetCurrentDirectory(MAX_PATH,chOld);
 			::SetCurrentDirectory(chMax);
-			UnLoad();
 			m_hModule = ::LoadLibrary(pDll);
 			if( m_hModule == NULL )
 			{
@@ -252,10 +253,6 @@ namespace base{
 			::SetCurrentDirectory(chOld);
 		}
 		virtual ~DLL()
-		{
-			UnLoad();
-		}
-		void UnLoad()
 		{
 			if( m_hModule )
 			{
@@ -294,6 +291,7 @@ namespace base{
 	{
 		if( (pCtrl==NULL) || (lpClass==NULL) )
 			return NULL;
+		
 		return static_cast<theX*>(pCtrl->GetInterface(lpClass));
 	}
 	template<typename theX>
@@ -403,4 +401,34 @@ namespace base{
 		memcpy(&dest, &source, sizeof(dest));
 		return dest;
 	}
+
+	template<class vX>
+	class SafeMacroX
+	{
+	public:
+		SafeMacroX()
+		{
+			InitializeCriticalSection(&m_tgSection);
+		}
+		~SafeMacroX()
+		{
+			DeleteCriticalSection(&m_tgSection);
+		}
+		void SetValueX(const vX& proxy)
+		{
+			EnterCriticalSection(&m_tgSection);
+			mValueX = proxy;
+			LeaveCriticalSection(&m_tgSection);
+		}
+		vX GetValueX()
+		{
+			vX proxy;
+			EnterCriticalSection(&m_tgSection);
+			proxy = mValueX;
+			LeaveCriticalSection(&m_tgSection);
+			return proxy;
+		}
+		CRITICAL_SECTION	m_tgSection;
+		vX mValueX;
+	};
 }

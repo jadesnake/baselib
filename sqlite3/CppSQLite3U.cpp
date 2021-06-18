@@ -19,10 +19,10 @@
 #include <atlconv.h>
 
 
-CppSQLite3ExceptionU::CppSQLite3ExceptionU(const int nErrCode,
-									LPTSTR szErrMess,
-									bool bDeleteMsg/*=true*/) :
-									mnErrCode(nErrCode)
+CppSQLite3ExceptionU::CppSQLite3ExceptionU(CSQLiteTool *sqlDB,
+										   const int nErrCode,LPTSTR szErrMess,
+										   bool bDeleteMsg/*=true*/) 
+		:mnErrCode(nErrCode)
 {
 	int ss = szErrMess ? _tcslen(szErrMess)+50 : 50;
 	mpszErrMess=new TCHAR[ss];
@@ -33,7 +33,7 @@ CppSQLite3ExceptionU::CppSQLite3ExceptionU(const int nErrCode,
 
 	if (bDeleteMsg && szErrMess)
 	{
-		CSQLiteTool::Get()->SqliteFree(szErrMess);
+		sqlDB->SqliteFree(szErrMess);
 	}
 }
 
@@ -101,12 +101,20 @@ CppSQLite3ExceptionU::~CppSQLite3ExceptionU()
 /////////////////////////////////////////////////////////////////////////////
 // CppSQLite3DBU
 
-CppSQLite3DBU::CppSQLite3DBU()
+CppSQLite3DBU::CppSQLite3DBU(CSQLiteTool *sqlTool)
 {
 	mpDB = 0;
 	mnBusyTimeoutMs = 60000; // 60 seconds
 	mpVM = NULL;
 	autoShutDown = true;
+	mynewtool = false;
+	if(sqlTool==NULL)
+	{
+		mynewtool = true;
+		mSqlTool = new CSQLiteTool;
+	}
+	else
+		mSqlTool = sqlTool;
 }
 
 CppSQLite3DBU::CppSQLite3DBU(const CppSQLite3DBU& db)
@@ -115,6 +123,9 @@ CppSQLite3DBU::CppSQLite3DBU(const CppSQLite3DBU& db)
 	mnBusyTimeoutMs = 60000; // 60 seconds
 	mpVM=NULL;
 	autoShutDown = false;
+	mSqlTool = new CSQLiteTool;
+	mynewtool = true;
+	mSqlTool->Initialize( const_cast<CppSQLite3DBU&>(db).GetSqlTool() );
 }
 void CppSQLite3DBU::setAutoShutDown(bool autoShutDown)
 {
@@ -123,8 +134,10 @@ void CppSQLite3DBU::setAutoShutDown(bool autoShutDown)
 CppSQLite3DBU::~CppSQLite3DBU()
 {
 	close();
-	if(autoShutDown)
-		CSQLiteTool::Get()->Shutdown();
+	if(autoShutDown && mSqlTool)
+		mSqlTool->Shutdown();
+	if(mSqlTool && mynewtool)
+		delete mSqlTool;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -138,7 +151,9 @@ CppSQLite3DBU& CppSQLite3DBU::operator=(const CppSQLite3DBU& db)
 
 bool CppSQLite3DBU::open(LPCTSTR szFile)
 {
-    int nRet = CSQLiteTool::Get()->OpenDB(CT2CA(szFile,CP_UTF8), &mpDB); 
+	if(mSqlTool==NULL)
+		return false;
+    int nRet = mSqlTool->OpenDB(CT2CA(szFile,CP_UTF8), &mpDB); 
 	if (nRet != SQLITE_OK)
 	{
 		GetLastMsg();
@@ -150,8 +165,9 @@ bool CppSQLite3DBU::open(LPCTSTR szFile)
 bool CppSQLite3DBU::openEx( LPCTSTR pszMemory )
 {
 	int nRet;
-
-	nRet = CSQLiteTool::Get()->OpenDB(CT2A(pszMemory,CP_UTF8), &mpDB); 
+	if(mSqlTool==NULL)
+		return false;
+	nRet = mSqlTool->OpenDB(CT2A(pszMemory,CP_UTF8), &mpDB); 
 	if (nRet != SQLITE_OK)
 	{
 		GetLastMsg();
@@ -162,13 +178,18 @@ bool CppSQLite3DBU::openEx( LPCTSTR pszMemory )
 }
 void CppSQLite3DBU::InitParam()
 {
-	CSQLiteTool::Get()->SetBusyTimeout(mpDB,mnBusyTimeoutMs);
+	mSqlTool->SetBusyTimeout(mpDB,mnBusyTimeoutMs);
 	//CSQLiteTool::Get()->ExecuteSQL(mpDB, "PRAGMA journal_mode = WAL;", NULL, 0, 0); 
-	CSQLiteTool::Get()->ExecuteSQL(mpDB, "PRAGMA encoding=UTF-8;", NULL, 0, 0); 
+	mSqlTool->ExecuteSQL(mpDB, "PRAGMA encoding=UTF-8;", NULL, 0, 0); 
+	mSqlTool->ExecuteSQL(mpDB, "synchronous = FULL;", NULL, 0, 0); 	
+}
+bool CppSQLite3DBU::backup(const CppSQLite3DBU &from,LPCTSTR dbNM)
+{
+	return mSqlTool->Backup(from.mpDB,CT2CA(dbNM),mpDB,CT2CA(dbNM));
 }
 void CppSQLite3DBU::GetLastMsg()
 {
-	LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+	LPCTSTR szError = (LPCTSTR) mSqlTool->GetErrMsg16(mpDB);
 	lastMsg = szError;
 	//CSQLiteTool::Get()->SqliteFree(szError);
 }
@@ -179,7 +200,7 @@ bool CppSQLite3DBU::SetKeyDB(LPCTSTR szKey)
 		return false;
 	}
 	std::string pwd = (char*)CT2CA(szKey,CP_UTF8);
-	int nRet=CSQLiteTool::Get()->SetKey(mpDB,pwd.c_str(),pwd.length());
+	int nRet = mSqlTool->SetKey(mpDB,pwd.c_str(),pwd.length());
 	if(nRet != SQLITE_OK)
 	{
 		GetLastMsg();
@@ -191,7 +212,7 @@ bool CppSQLite3DBU::SetKeyDB(LPCTSTR szKey)
 
 bool CppSQLite3DBU::EncryptDB(LPCTSTR szDBFile,LPCTSTR szKey)
 {
-	int nRet = CSQLiteTool::Get()->OpenDB(CT2CA(szDBFile,CP_UTF8),&mpDB);
+	int nRet = mSqlTool->OpenDB(CT2CA(szDBFile,CP_UTF8),&mpDB);
 	if (nRet != SQLITE_OK)
 	{
 		GetLastMsg();
@@ -200,7 +221,7 @@ bool CppSQLite3DBU::EncryptDB(LPCTSTR szDBFile,LPCTSTR szKey)
 	else
 	{
 		std::string pwd = (char*)CT2CA(szKey,CP_UTF8);
-		nRet=CSQLiteTool::Get()->SetKey(mpDB,pwd.c_str(),pwd.length());
+		nRet = mSqlTool->SetKey(mpDB,pwd.c_str(),pwd.length());
 		if(nRet != SQLITE_OK)
 		{
 			GetLastMsg();
@@ -215,7 +236,7 @@ bool CppSQLite3DBU::ResetKeyDB(LPCTSTR szKey)
 {
 	int nRet = 0;
 	std::string key = (char*)CT2CA(szKey,CP_UTF8);
-	if( nRet != CSQLiteTool::Get()->ResetKey(mpDB,key.c_str(),key.length()) )
+	if( nRet != mSqlTool->ResetKey(mpDB,key.c_str(),key.length()) )
 	{
 		GetLastMsg();
 		close();
@@ -224,21 +245,13 @@ bool CppSQLite3DBU::ResetKeyDB(LPCTSTR szKey)
 	return true;
 }
 
-//释放所有资源
-void CppSQLite3DBU::Release()
-{
-	CSQLiteTool::Get()->Release();
-
-	CSQLiteTool::Destroy();
-}
-
 void CppSQLite3DBU::close()
 {
 	if (mpDB)
 	{
 		finalize();
 		
-		int nRet = CSQLiteTool::Get()->CloseDB(mpDB);
+		int nRet = mSqlTool->CloseDB(mpDB);
 		if (nRet != SQLITE_OK)
 		{
 			GetLastMsg();
@@ -251,12 +264,12 @@ CppSQLite3StatementU CppSQLite3DBU::compileStatement(LPCTSTR szSQL)
 {
 	if (!mpDB)
 	{
-		return CppSQLite3StatementU();
+		return CppSQLite3StatementU(this);
 	}	
 
 	sqlite3_stmt* pVM = compile(szSQL);
 
-	return CppSQLite3StatementU(mpDB, pVM);
+	return CppSQLite3StatementU(this,pVM);
 }
 
 
@@ -275,7 +288,7 @@ bool CppSQLite3DBU::finalize()
 {
 	if (mpVM)
 	{
-		int nRet = CSQLiteTool::Get()->Finalize(mpVM);
+		int nRet = mSqlTool->Finalize(mpVM);
 		mpVM = 0;
 		if (nRet != SQLITE_OK)
 		{
@@ -307,6 +320,7 @@ int CppSQLite3DBU::execDML(LPCTSTR szSQL)
 	{
 		return SQLITE_ERROR;
 	}
+	lastMsg.Empty();
 	do{ 
 		pVM = compile(szSQL);
 		if(pVM==NULL)
@@ -314,25 +328,21 @@ int CppSQLite3DBU::execDML(LPCTSTR szSQL)
 			nRet=SQLITE_ERROR;
 			break;
 		}
-
-		nRet = CSQLiteTool::Get()->DBStep(pVM);
+		nRet = mSqlTool->DBStep(pVM);
 		if (nRet == SQLITE_ERROR)
 		{
 			GetLastMsg();
 			//记录日志
 			if(NULL!=pVM)
 			{
-				CSQLiteTool::Get()->Finalize(pVM);
+				mSqlTool->Finalize(pVM);
 				pVM=NULL;
 			}			
 			//close();
 			nRet=SQLITE_ERROR;
 			break;
 		}
-		nRet = CSQLiteTool::Get()->Finalize(pVM);
-
-		//LOG_FUNC_P0("sleep");
-		//Sleep(1);
+		nRet = mSqlTool->Finalize(pVM);
 	} 
 	while( nRet == SQLITE_SCHEMA );
 	if(nRet != SQLITE_OK)
@@ -344,9 +354,9 @@ CppSQLite3QueryU CppSQLite3DBU::execQuery(LPCTSTR szSQL)
 {
 	if (!mpDB)
 	{
-		return CppSQLite3QueryU();
+		return CppSQLite3QueryU(this);
 	}
-
+	lastMsg.Empty();
 	int nRet;
 	sqlite3_stmt* pVM; 
 	do{ 
@@ -356,24 +366,24 @@ CppSQLite3QueryU CppSQLite3DBU::execQuery(LPCTSTR szSQL)
 			nRet=SQLITE_ERROR;
 			break;
 		}
-		nRet = CSQLiteTool::Get()->DBStep(pVM);
+		nRet = mSqlTool->DBStep(pVM);
 		if (nRet == SQLITE_DONE)
 		{	
-			return CppSQLite3QueryU(mpDB, pVM, true/*eof*/);
+			return CppSQLite3QueryU(this, pVM, true/*eof*/);
 		}
 		else if (nRet == SQLITE_ROW)
 		{	// at least 1 row
-			return CppSQLite3QueryU(mpDB, pVM, false/*eof*/);
+			return CppSQLite3QueryU(this, pVM, false/*eof*/);
 		}
 		else if(nRet==SQLITE_ERROR){
 			GetLastMsg();
 		}
-		nRet = CSQLiteTool::Get()->Finalize(pVM);
+		nRet = mSqlTool->Finalize(pVM);
 		Sleep(1);
 	} 
 	while( nRet == SQLITE_SCHEMA ); 
 	GetLastMsg();
-	return CppSQLite3QueryU();
+	return CppSQLite3QueryU(this);
 }
 
 
@@ -411,29 +421,15 @@ CString CppSQLite3DBU::execScalarStr(LPCTSTR szSQL)
 
 sqlite_int64 CppSQLite3DBU::lastRowId()
 {
-	return CSQLiteTool::Get()->GetLastInsertRowID(mpDB);
+	return mSqlTool->GetLastInsertRowID(mpDB);
 }
 
 
 void CppSQLite3DBU::setBusyTimeout(int nMillisecs)
 {
 	mnBusyTimeoutMs = nMillisecs;
-	CSQLiteTool::Get()->SetBusyTimeout(mpDB, mnBusyTimeoutMs);
+	mSqlTool->SetBusyTimeout(mpDB, mnBusyTimeoutMs);
 }
-
-
-bool CppSQLite3DBU::checkDB()
-{
-	if (!mpDB)
-	{
-		//记录日志
-
-		return false;
-	}	
-
-	return true;
-}
-
 
 sqlite3_stmt* CppSQLite3DBU::compile(LPCTSTR szSQL)
 {	
@@ -441,20 +437,20 @@ sqlite3_stmt* CppSQLite3DBU::compile(LPCTSTR szSQL)
 	{
 		return NULL;
 	}
+	lastMsg.Empty();
 	sqlite3_stmt* pVM;
-	int nRet=CSQLiteTool::Get()->Prepare16_V2(mpDB,szSQL,-1,&pVM,NULL);
+	int nRet = mSqlTool->Prepare16_V2(mpDB,szSQL,-1,&pVM,NULL);
 	if (nRet != SQLITE_OK)
 	{		
 		GetLastMsg();
 		//记录日志
 		if(NULL!=pVM)
 		{
-			CSQLiteTool::Get()->Finalize(pVM);
+			mSqlTool->Finalize(pVM);
 		}
 		//close();
 		pVM=NULL;
 	}
-
 	return pVM;
 }
 
@@ -469,11 +465,11 @@ int CppSQLite3DBU::execSys(LPCTSTR szSQL,CAtlString & stRet )
 	strtemp=szSQL;
 #endif
 	char *msg = NULL;
-	nRet=CSQLiteTool::Get()->ExecuteSQL(mpDB, strtemp.c_str(), NULL, 0, &msg); 
+	nRet = mSqlTool->ExecuteSQL(mpDB, strtemp.c_str(), NULL, 0, &msg); 
     stRet = msg;
 	if( msg )
 	{
-		CSQLiteTool::Get()->SqliteFree(msg);
+		mSqlTool->SqliteFree(msg);
 	}
 	if(nRet!=SQLITE_OK)
 	{
@@ -483,23 +479,25 @@ int CppSQLite3DBU::execSys(LPCTSTR szSQL,CAtlString & stRet )
 }
 
 //////////////////////// CppSQLite3StatementU  ///////////////////////////////////////////
-CppSQLite3StatementU::CppSQLite3StatementU()
+CppSQLite3StatementU::CppSQLite3StatementU(CppSQLite3DBU *sqlDB)
 {
 	mpDB = 0;
 	mpVM = 0;
+	mSqliteDB = sqlDB;
 }
 
 CppSQLite3StatementU::CppSQLite3StatementU(const CppSQLite3StatementU& rStatement)
 {
 	mpDB = rStatement.mpDB;
 	mpVM = rStatement.mpVM;
+	mSqliteDB = rStatement.mSqliteDB;
 	// Only one object can own VM
 	const_cast<CppSQLite3StatementU&>(rStatement).mpVM = 0;
 }
 
-CppSQLite3StatementU::CppSQLite3StatementU(sqlite3* pDB, sqlite3_stmt* pVM)
+CppSQLite3StatementU::CppSQLite3StatementU(CppSQLite3DBU *sqlDB,sqlite3_stmt* pVM)
 {
-	mpDB = pDB;
+	mpDB = sqlDB->mpDB;
 	mpVM = pVM;
 }
 
@@ -516,7 +514,7 @@ CppSQLite3StatementU& CppSQLite3StatementU::operator=(const CppSQLite3StatementU
 {
 	mpDB = rStatement.mpDB;
 	mpVM = rStatement.mpVM;
-
+	mSqliteDB = rStatement.mSqliteDB;
 	const_cast<CppSQLite3StatementU&>(rStatement).mpVM = 0;
 	return *this;
 }
@@ -528,29 +526,29 @@ int CppSQLite3StatementU::execDML()
 		return SQLITE_ERROR;
 	}
 
-	int nRet = CSQLiteTool::Get()->DBStep(mpVM);
+	int nRet = mSqliteDB->GetSqlTool()->DBStep(mpVM);
 
 	if (nRet == SQLITE_DONE)
 	{
-		int nRowsChanged = CSQLiteTool::Get()->SqliteChanges(mpDB);
+		int nRowsChanged = mSqliteDB->GetSqlTool()->SqliteChanges(mpDB);
 
-		nRet = CSQLiteTool::Get()->Reset(mpVM);
+		nRet = mSqliteDB->GetSqlTool()->Reset(mpVM);
 		if (nRet != SQLITE_OK)
 		{
-			LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+			LPCTSTR szError = (LPCTSTR) mSqliteDB->GetSqlTool()->GetErrMsg16(mpDB);
 			lastMsg = szError;
-			CSQLiteTool::Get()->SqliteFree(szError);
+			mSqliteDB->GetSqlTool()->SqliteFree(szError);
 			return SQLITE_ERROR;
 		}
 		return nRowsChanged;
 	}
 	else
 	{
-		nRet = CSQLiteTool::Get()->Reset(mpVM);
+		nRet = mSqliteDB->GetSqlTool()->Reset(mpVM);
 
-		LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+		LPCTSTR szError = (LPCTSTR) mSqliteDB->GetSqlTool()->GetErrMsg16(mpDB);
 		lastMsg = szError;
-		CSQLiteTool::Get()->SqliteFree(szError);
+		mSqliteDB->GetSqlTool()->SqliteFree(szError);
 
 		return SQLITE_ERROR;
 	}
@@ -566,7 +564,7 @@ bool CppSQLite3StatementU::bind(int nParam, LPCTSTR szValue)
 		return false;
 	}
 
-	int nRes = CSQLiteTool::Get()->BindText16(mpVM, nParam, szValue, -1, SQLITE_TRANSIENT);
+	int nRes = mSqliteDB->GetSqlTool()->BindText16(mpVM, nParam, szValue, -1, SQLITE_TRANSIENT);
 
 	if (nRes != SQLITE_OK)
 		return false;
@@ -582,7 +580,7 @@ bool CppSQLite3StatementU::bind(int nParam, const int nValue)
 		return false;
 	}
 
-	int nRes = CSQLiteTool::Get()->BindInt(mpVM, nParam, nValue);
+	int nRes = mSqliteDB->GetSqlTool()->BindInt(mpVM, nParam, nValue);
 	if (nRes != SQLITE_OK)
 		return false;
 
@@ -596,7 +594,7 @@ bool CppSQLite3StatementU::bind(int nParam, const double dValue)
 	{
 		return false;
 	}
-	int nRes = CSQLiteTool::Get()->BindDouble(mpVM, nParam, dValue);
+	int nRes = mSqliteDB->GetSqlTool()->BindDouble(mpVM, nParam, dValue);
 	if (nRes != SQLITE_OK)
 		return false;
 
@@ -610,12 +608,12 @@ bool CppSQLite3StatementU::bind(int nParam, const unsigned char* blobValue, int 
 	{
 		return false;
 	}
-	int nRes = CSQLiteTool::Get()->BindBlob(mpVM, nParam,(const void*)blobValue, nLen, SQLITE_TRANSIENT);
+	int nRes = mSqliteDB->GetSqlTool()->BindBlob(mpVM, nParam,(const void*)blobValue, nLen, SQLITE_TRANSIENT);
 	if (nRes != SQLITE_OK)
 	{
-		LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+		LPCTSTR szError = (LPCTSTR) mSqliteDB->GetSqlTool()->GetErrMsg16(mpDB);
 		lastMsg = szError;
-		CSQLiteTool::Get()->SqliteFree(szError);
+		mSqliteDB->GetSqlTool()->SqliteFree(szError);
 
 		return false;
 	}
@@ -628,12 +626,12 @@ bool CppSQLite3StatementU::bindNull(int nParam)
 	{
 		return false;
 	}
-	int nRes = CSQLiteTool::Get()->BindNull(mpVM, nParam);
+	int nRes = mSqliteDB->GetSqlTool()->BindNull(mpVM, nParam);
 	if (nRes != SQLITE_OK)
 	{
-		LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+		LPCTSTR szError = (LPCTSTR) mSqliteDB->GetSqlTool()->GetErrMsg16(mpDB);
 		lastMsg = szError;
-		CSQLiteTool::Get()->SqliteFree(szError);
+		mSqliteDB->GetSqlTool()->SqliteFree(szError);
 
   		return false;
 	}
@@ -645,13 +643,13 @@ bool CppSQLite3StatementU::reset()
 {
 	if (mpVM)
 	{
-		int nRet = CSQLiteTool::Get()->Reset(mpVM);
+		int nRet = mSqliteDB->GetSqlTool()->Reset(mpVM);
 
 		if (nRet != SQLITE_OK)
 		{
-			LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+			LPCTSTR szError = (LPCTSTR) mSqliteDB->GetSqlTool()->GetErrMsg16(mpDB);
 			lastMsg = szError;
-			CSQLiteTool::Get()->SqliteFree(szError);
+			mSqliteDB->GetSqlTool()->SqliteFree(szError);
 
 			return false;
 		}
@@ -664,15 +662,13 @@ bool CppSQLite3StatementU::finalize()
 {
 	if (mpVM)
 	{
-		int nRet = CSQLiteTool::Get()->Finalize(mpVM);
+		int nRet = mSqliteDB->GetSqlTool()->Finalize(mpVM);
 		mpVM = 0;
-
 		if (nRet != SQLITE_OK)
 		{
-			LPCTSTR szError = (LPCTSTR) CSQLiteTool::Get()->GetErrMsg16(mpDB);
+			LPCTSTR szError = (LPCTSTR)mSqliteDB->GetSqlTool()->GetErrMsg16(mpDB);
 			lastMsg = szError;
-			CSQLiteTool::Get()->SqliteFree(szError);
-
+			mSqliteDB->GetSqlTool()->SqliteFree(szError);
 			return false;
 		}
 	}
@@ -680,12 +676,10 @@ bool CppSQLite3StatementU::finalize()
 	return true;
 }
 
-
 bool CppSQLite3StatementU::checkDB()
 {
 	if (mpDB == 0) 
 		return false;
-
 	return true;
 }
 
@@ -693,14 +687,13 @@ bool CppSQLite3StatementU::checkVM()
 {
 	if (mpVM == 0)
 		return false;
-
 	return true;
 }
 
-
 /////////////////////  CppSQLite3QueryU  //////////////////////////////////////////////////
-CppSQLite3QueryU::CppSQLite3QueryU()
+CppSQLite3QueryU::CppSQLite3QueryU(CppSQLite3DBU *sqlDB)
 {
+	mSqlDB = sqlDB;
 	mpVM = 0;
 	mbEof = true;
 	mnCols = 0;
@@ -715,16 +708,18 @@ CppSQLite3QueryU::CppSQLite3QueryU(const CppSQLite3QueryU& rQuery)
 	mbEof = rQuery.mbEof;
 	mnCols = rQuery.mnCols;
 	mbOwnVM = rQuery.mbOwnVM;
+	mSqlDB = rQuery.mSqlDB;
 }
 
 
-CppSQLite3QueryU::CppSQLite3QueryU(sqlite3* pDB, sqlite3_stmt* pVM,
+CppSQLite3QueryU::CppSQLite3QueryU(CppSQLite3DBU *sqlDB,sqlite3_stmt* pVM,
 								 bool bEof,	 bool bOwnVM/*=true*/)
 {
-	mpDB = pDB;
+	mSqlDB=sqlDB;
+	mpDB = sqlDB->mpDB;
 	mpVM = pVM;
 	mbEof = bEof;
-	mnCols = CSQLiteTool::Get()->GetColumnCount(mpVM);
+	mnCols = mSqlDB->GetSqlTool()->GetColumnCount(mpVM);
 	mbOwnVM = bOwnVM;
 }
 
@@ -745,7 +740,7 @@ CppSQLite3QueryU& CppSQLite3QueryU::operator=(const CppSQLite3QueryU& rQuery)
 		finalize();
 	}
 	catch (...)	{ }
-
+	mSqlDB = rQuery.mSqlDB;
 	mpVM = rQuery.mpVM;
 	const_cast<CppSQLite3QueryU&>(rQuery).mpVM = 0;
 	mbEof = rQuery.mbEof;
@@ -780,7 +775,7 @@ LPCTSTR CppSQLite3QueryU::fieldValue(int nField)
 		return _T("");
 	}		
 
-	return (LPCTSTR)CSQLiteTool::Get()->GetColumnUnicodeText(mpVM, nField);
+	return (LPCTSTR)mSqlDB->GetSqlTool()->GetColumnUnicodeText(mpVM, nField);
 }
 
 
@@ -788,7 +783,7 @@ LPCTSTR CppSQLite3QueryU::fieldValue(LPCTSTR szField)
 {
 	int nField = fieldIndex(szField);
 
-	return (LPCTSTR)CSQLiteTool::Get()->GetColumnUnicodeText(mpVM, nField);
+	return (LPCTSTR)mSqlDB->GetSqlTool()->GetColumnUnicodeText(mpVM, nField);
 }
 
 
@@ -800,7 +795,7 @@ int CppSQLite3QueryU::getIntField(int nField, int nNullValue/*=0*/)
 	}
 	else
 	{
-		return CSQLiteTool::Get()->GetColumnInt(mpVM, nField);
+		return mSqlDB->GetSqlTool()->GetColumnInt(mpVM, nField);
 	}
 }
 
@@ -824,7 +819,7 @@ __int64 CppSQLite3QueryU::getInt64Field(int nField,__int64 nNullValue)
 	}
 	else
 	{
-		return CSQLiteTool::Get()->GetColumnInt64(mpVM, nField);
+		return mSqlDB->GetSqlTool()->GetColumnInt64(mpVM, nField);
 	}
 }
 
@@ -837,7 +832,7 @@ double CppSQLite3QueryU::getFloatField(int nField, double fNullValue/*=0.0*/)
 	}
 	else
 	{
-		return CSQLiteTool::Get()->GetColumnDouble(mpVM, nField);
+		return mSqlDB->GetSqlTool()->GetColumnDouble(mpVM, nField);
 	}
 }
 
@@ -858,7 +853,7 @@ LPCTSTR CppSQLite3QueryU::getStringField(int nField, LPCTSTR szNullValue/*=""*/)
 	}
 	else
 	{
-		return (LPCTSTR)CSQLiteTool::Get()->GetColumnUnicodeText(mpVM, nField);
+		return (LPCTSTR) mSqlDB->GetSqlTool()->GetColumnUnicodeText(mpVM, nField);
 	}
 }
 
@@ -866,6 +861,20 @@ LPCTSTR CppSQLite3QueryU::getStringField(LPCTSTR szField, LPCTSTR szNullValue/*=
 {
 	int nField = fieldIndex(szField);
 	return getStringField(nField, szNullValue);
+}
+
+LPCSTR CppSQLite3QueryU::getAsciiFieldIdx(int nField)
+{
+	return (LPCSTR)mSqlDB->GetSqlTool()->GetColumnText(mpVM, nField);
+}
+LPCSTR CppSQLite3QueryU::getAsciiStrField(LPCTSTR szField, LPCSTR szNullValue)
+{
+	int nField = fieldIndex(szField);
+	if (fieldDataType(nField) == SQLITE_NULL)
+	{
+		return szNullValue;
+	}
+	return (LPCSTR)mSqlDB->GetSqlTool()->GetColumnText(mpVM, nField);
 }
 
 
@@ -881,8 +890,8 @@ const unsigned char* CppSQLite3QueryU::getBlobField(int nField, int& nLen)
 		return NULL;
 	}		
 
-	nLen = CSQLiteTool::Get()->GetColumnByteLen16(mpVM, nField);
-	return (const unsigned char*)CSQLiteTool::Get()->GetColumnBlob(mpVM, nField);
+	nLen = mSqlDB->GetSqlTool()->GetColumnByteLen16(mpVM, nField);
+	return (const unsigned char*)mSqlDB->GetSqlTool()->GetColumnBlob(mpVM, nField);
 }
 
 
@@ -914,7 +923,7 @@ int CppSQLite3QueryU::fieldIndex(LPCTSTR szField)
 	{
 		for (int nField = 0; nField < mnCols; nField++)
 		{
-			LPCTSTR szTemp = (LPCTSTR)CSQLiteTool::Get()->GetColumnUnicodeName(mpVM, nField);
+			LPCTSTR szTemp = (LPCTSTR)mSqlDB->GetSqlTool()->GetColumnUnicodeName(mpVM, nField);
 
 			if (_tcscmp(szField, szTemp) == 0)
 			{
@@ -939,7 +948,7 @@ LPCTSTR CppSQLite3QueryU::fieldName(int nCol)
 		
 		return _T("");
 	}
-	return (LPCTSTR)CSQLiteTool::Get()->GetColumnUnicodeName(mpVM, nCol);
+	return (LPCTSTR)mSqlDB->GetSqlTool()->GetColumnUnicodeName(mpVM, nCol);
 }
 
 
@@ -955,7 +964,7 @@ LPCTSTR CppSQLite3QueryU::fieldDeclType(int nCol)
 		
 		return _T("");
 	}
-	return (LPCTSTR)CSQLiteTool::Get()->GetColumnDeclType16(mpVM, nCol);
+	return (LPCTSTR) mSqlDB->GetSqlTool()->GetColumnDeclType16(mpVM, nCol);
 }
 
 
@@ -971,7 +980,7 @@ int CppSQLite3QueryU::fieldDataType(int nCol)
 		
 		return -1;
 	}
-	return CSQLiteTool::Get()->GetColumnType(mpVM, nCol);
+	return mSqlDB->GetSqlTool()->GetColumnType(mpVM, nCol);
 }
 
 
@@ -994,7 +1003,7 @@ void CppSQLite3QueryU::nextRow()
 		return;
 	}
 
-	int nRet = CSQLiteTool::Get()->DBStep(mpVM);
+	int nRet = mSqlDB->GetSqlTool()->DBStep(mpVM);
 
 	if (nRet == SQLITE_DONE)
 	{
@@ -1006,11 +1015,11 @@ void CppSQLite3QueryU::nextRow()
 	}
 	else
 	{
-		nRet = CSQLiteTool::Get()->Finalize(mpVM);
+		nRet = mSqlDB->GetSqlTool()->Finalize(mpVM);
 		mpVM = 0;
-		LPCTSTR szError = (LPCTSTR)CSQLiteTool::Get()->GetErrMsg16(mpDB);
+		LPCTSTR szError = (LPCTSTR)mSqlDB->GetSqlTool()->GetErrMsg16(mpDB);
 		lastMsg = szError;
-		CSQLiteTool::Get()->SqliteFree(szError);
+		mSqlDB->GetSqlTool()->SqliteFree(szError);
 
 		mbEof = true;
 	}
@@ -1021,13 +1030,13 @@ bool CppSQLite3QueryU::finalize()
 {
 	if (mpVM && mbOwnVM)
 	{
-		int nRet = CSQLiteTool::Get()->Finalize(mpVM);
+		int nRet = mSqlDB->GetSqlTool()->Finalize(mpVM);
 		mpVM = 0;
 		if (nRet != SQLITE_OK)
 		{
-			LPCTSTR szError = (LPCTSTR)CSQLiteTool::Get()->GetErrMsg16(mpDB);
+			LPCTSTR szError = (LPCTSTR)mSqlDB->GetSqlTool()->GetErrMsg16(mpDB);
 			lastMsg = szError;
-			CSQLiteTool::Get()->SqliteFree(szError);
+			mSqlDB->GetSqlTool()->SqliteFree(szError);
 
 			return false;
 		}

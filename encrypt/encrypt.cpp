@@ -48,50 +48,6 @@ bool decodeHex(const char *inhex,DWORD hexlen,std::string &to)
 	return true;
 }
 
-void AesEncode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt::BIN_TYPE type)
-{
-	WinAES	wA;
-	byte	chOut[1024];
-	size_t  nOutlen = sizeof(chOut);
-	memset(chOut,0,sizeof(chOut));
-	wA.SetKey((byte*)strKey.GetString(),strKey.GetLength());
-	wA.Encrypt((byte*)strIn.GetString(),strIn.GetLength(),chOut,nOutlen);
-	if(type==encrypt::BIN_BASE64)
-	{
-		std::string tmpBase64((char*)chOut,nOutlen);
-		tmpBase64 = base::encode64(tmpBase64);
-		strOut.Empty();
-		strOut.Append(tmpBase64.c_str());
-		return ;
-	}
-	if(type==encrypt::BIN_HEX)
-	{
-		encodeHex((const char*)chOut,nOutlen,strOut);
-	}
-}
-void AesDecode(CAtlStringA strIn,CAtlStringA &strOut,CAtlStringA strKey,encrypt::BIN_TYPE type)
-{
-	WinAES	wA;
-	byte	*chOut=NULL;
-	std::string binData;
-	if(type==encrypt::BIN_BASE64)
-	{
-		binData = base::decode64(strIn.GetString());
-	}
-	else if(type==encrypt::BIN_HEX)
-	{
-		decodeHex(strIn.GetString(),strIn.GetLength(),binData);
-	}
-	size_t  nOutlen = binData.size()*3;
-	chOut = new byte[nOutlen];
-	memset(chOut,0,sizeof(chOut));
-	wA.SetKey((byte*)strKey.GetString(),strKey.GetLength());
-	wA.Decrypt((byte*)binData.c_str(),binData.size(),chOut,nOutlen);
-	strOut.Empty();
-	strOut.Append((const char*)chOut,nOutlen);
-	delete []chOut;
-}
-
 DWORD  GetHash(BYTE *pbData, DWORD dwDataLen, ALG_ID algId,CAtlStringA &out)
 {
 	DWORD dwReturn = 0;

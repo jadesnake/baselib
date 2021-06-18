@@ -18,9 +18,9 @@ namespace base
 	{
 	public:
 		IListImpl(unsigned int nType = 0) : m_unType(nType)
-		{	m_nSz = 0;		}
+		{	m_nSz = 0;		};
 		~IListImpl()
-		{	clear();		}
+		{	clear();		};
 		std::tr1::shared_ptr<theItem> push_back()
 		{
 			std::tr1::shared_ptr<theItem> ret( new theItem() );
