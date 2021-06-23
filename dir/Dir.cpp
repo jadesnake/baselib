@@ -918,6 +918,6 @@ CAtlString GetMaxBetysDrive()
 		}		
 		lpDriveStr += 4;		
 	}
-	delete driveStr;
+	delete []driveStr;
 	return strCurDrive;
 }
