@@ -351,7 +351,7 @@ namespace SqliteOpt{
 		{
 			return false;
 		}
-		CAtlString desc;
+ 		CAtlString desc;
 		oneJob = tmpArray.getBegin();
 		while(oneJob = tmpArray.getNext())
 		{
@@ -423,6 +423,8 @@ namespace SqliteOpt{
 		{
 			m_db->close();
 			::DeleteFile(file);
+			if(!m_dbBack.IsEmpty())
+				::CopyFile(m_dbBack,file,FALSE);
 			//´´½¨ÐÂ¿â
 			if(!Open(file,driver))
 				return false;
@@ -526,6 +528,12 @@ namespace SqliteOpt{
 			m_dbfile = file;
 		}
 		return bRet;
+	}
+	void Access::DriverInit()
+	{
+		CLockGuard guard(&m_lkDBFILE);
+		if(m_db && m_init)
+			m_db->GetSqlTool()->Initialize(m_db->GetSqlTool());
 	}
 	bool Access::Open(CAtlString file,CAtlString driver)
 	{

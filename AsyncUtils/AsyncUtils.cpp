@@ -41,7 +41,7 @@ namespace base
 		long key = nT;
 		CLockGuard lock(&m_mutex);
 		if(nT==0)
-			key = (long)c;	//如果没给索引那么用地址做索引
+			key = (unsigned long)c;	//如果没给索引那么用地址做索引
 		KEY_STACK::iterator it = m_stack.find(key);
 		if( it!=m_stack.end() )
 			return false;
@@ -73,7 +73,6 @@ namespace base
 		m_win    = win;
 		m_curStats = UNSTART;
 		memset(m_timer,0,sizeof(m_timer));
-		Back2Front::Get()->pushStack(this);
 	}
 	BackLogicBase::~BackLogicBase(void)
 	{
@@ -108,8 +107,10 @@ namespace base
 			m_quit = ::CreateEvent(NULL,FALSE,FALSE,NULL);
 			m_run = ::CreateEvent(NULL,FALSE,FALSE,NULL);
  			m_thread = (HANDLE)_beginthreadex(NULL,0,&BackLogicBase::ThreadProc,this,0,&m_id);
+			Back2Front::Get()->pushStack(this);
 		}
-		::SetEvent(m_run);
+		if(m_run)
+			::SetEvent(m_run);
 	}
 	int BackLogicBase::addTimer(UINT nInterval,bool bImmediately)
 	{
@@ -193,11 +194,13 @@ namespace base
 			::SetEvent(m_quit);		//结束后台
 			if(m_id!=tid)
 			{
-				::WaitForSingleObject(m_thread,waitTM);
+				if(WAIT_TIMEOUT==::WaitForSingleObject(m_thread,waitTM))
+					return ;
 			}
 			::CloseHandle(m_thread);
 			UpdateStatus(FINISH);
 			m_thread = NULL;
+			Back2Front::Get()->remove((unsigned long)this);
 		}
 	}
 	BackLogicBase::Status  BackLogicBase::getStatus()

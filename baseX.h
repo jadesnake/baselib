@@ -8,7 +8,6 @@ namespace DuiLib
 }
 #include "MacroX.h"
 namespace base{
-
 	//引用计数器接口
 	class IRef
 	{
@@ -430,5 +429,28 @@ namespace base{
 		}
 		CRITICAL_SECTION	m_tgSection;
 		vX mValueX;
+	};
+
+	template<typename X=int>
+	struct RESULT
+	{
+		bool bSuc;		//成功or失败
+		CAtlString err;	//异常信息
+		std::string rawBody; //原始报文
+		X xValue;	//参数值
+		RESULT(){	
+			bSuc = false;	
+		}
+		inline void SetError(CAtlString m){
+			bSuc = false;	err = m;
+		}
+		inline void SetSuc(){
+			bSuc = true;	err.Empty();
+		}
+		inline bool IsOK(){
+			if(err.IsEmpty()||err==L"ok")
+				return true;
+			return false;
+		}
 	};
 }

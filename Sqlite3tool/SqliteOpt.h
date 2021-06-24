@@ -20,6 +20,10 @@ namespace SqliteOpt{
 			name = n;
 			type = t;
 		}
+		Column(char n,CAtlString t){
+			name = n;
+			type = t;
+		}
 		Column(){
 
 		}
@@ -327,6 +331,7 @@ namespace SqliteOpt{
 		bool Run();
 		void Done();
 		bool CheckValid();
+		void DriverInit();
 	private:
 		Jobs m_jobsW;	//等待执行任务队列
 		Jobs m_jobsD;	//执行完成队列

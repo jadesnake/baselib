@@ -35,12 +35,12 @@ namespace base{
 	class Back2Front
 	{
 	public:
-		typedef std::map<long,classLife*> KEY_STACK;
+		typedef std::map<unsigned long,classLife*> KEY_STACK;
 		bool pushStack(classLife *c,long nT=0);
 		void clear();
 		bool postFront(HWND win,UINT msg,classLife *param);
 		template<class S>
-		S *cast(long p,LPCTSTR type)
+		S *cast(unsigned long p,LPCTSTR type)
 		{
 			CLockGuard lock(&m_mutex);
 			KEY_STACK::iterator it = m_stack.find(p);
@@ -51,7 +51,7 @@ namespace base{
 			return reinterpret_cast<S*>(what);
 		}
 		template<class S>
-		S *take(long p,LPCTSTR type)
+		S *take(unsigned long p,LPCTSTR type)
 		{
 			CLockGuard lock(&m_mutex);
 			KEY_STACK::iterator it = m_stack.find(p);
@@ -66,6 +66,19 @@ namespace base{
 				return reinterpret_cast<S*>(what);
 			}
 			return NULL;
+		}
+		void remove(unsigned long p)
+		{
+			CLockGuard lock(&m_mutex);
+			KEY_STACK::iterator it = m_stack.find(p);
+			if( it==m_stack.end() )
+				return ;
+			classLife *ret = it->second;
+			if(ret)
+			{
+				ret->RelRef();
+				m_stack.erase(it);
+			}
 		}
 	protected:
 		KEY_STACK m_stack;
