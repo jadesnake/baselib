@@ -48,14 +48,13 @@ public:
 	ZRESULT CustomExtract(const CString& root,const CString FirstZipPath,const CString strvalue);
 	ZRESULT Close();
 	DWORD	GetTotal();	//获取文件个数
-
-	CString getItemName();
-public:
-	CString strPass;
-protected:
-	virtual void SetRootDir(const CString& root);
+	bool GoToNextFile();
+	void GoToFirstFile();
 	virtual ZRESULT GetItem(ZIPENTRY *ze);
 	virtual ZRESULT UnItem(const ZIPENTRY &entry);
+	virtual void SetRootDir(const CString& root);
+public:
+	CString strPass;
 private:	
 	CString m_rootdir;
 	int		m_curfile;

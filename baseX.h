@@ -401,6 +401,7 @@ namespace base{
 		return dest;
 	}
 
+	//同步数据
 	template<class vX>
 	class SafeMacroX
 	{
@@ -431,6 +432,27 @@ namespace base{
 		vX mValueX;
 	};
 
+	//win内核对象
+	template<typename X=HANDLE>
+	class HKernel
+	{
+	public:
+		HKernel(){
+			mHandle = NULL;
+		}
+		void Close(){
+			if(mHandle){
+				::CloseHandle(mHandle);
+				mHandle = NULL;
+			}
+		}
+		X mHandle;
+	public:
+		HKernel(const X&);
+		void operator=(const X&);
+	};
+
+	//通用返回值结构
 	template<typename X=int>
 	struct RESULT
 	{

@@ -278,17 +278,13 @@ ZRESULT ZipExtract::Close() {
 	}
 	return ZR_OK;
 }
-
-CString ZipExtract::getItemName()
+bool ZipExtract::GoToNextFile()
 {
-	CString strName;
-	ZipExtract::ZIPENTRY entry;
-	ZRESULT zRes = GetItem(&entry);
-	if(zRes == ZR_OK)
-		strName = entry.name;
-	UnItem(entry);
-	unzGoToNextFile(m_pZipF);
-	return strName;
+	return (unzGoToNextFile(m_pZipF)==ZR_OK);
+}
+void ZipExtract::GoToFirstFile()
+{
+	unzGoToFirstFile(m_pZipF);
 }
 /************************************************************************/
 /*                            Ñ¹Ëõ                                      */
