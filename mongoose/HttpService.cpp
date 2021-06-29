@@ -228,11 +228,13 @@ namespace HttpService {
 		std::vector<std::string> params;
 		if(p.head.method=="get" || p.head.type.find("form") != std::string::npos)
 		{
-			if(p.body.size() && base::SplitBy(p.body,'&',params)==0)
+			if(p.body.size() && p.body.find('&')==std::string::npos)
 			{
 				OneParam op = ParseForm(p.body);
 				p.params[op.key] = op.val; 
 			}
+			else
+				base::SplitBy(p.body,'&',params);
 		}
 		else if(p.body.size())
 		{
