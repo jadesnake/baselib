@@ -33,6 +33,15 @@ namespace HttpService {
 		std::string type;
 		std::string charset;
 		std::string method;
+		PARAMS xValue;
+		std::string findX(const std::string& k)
+		{
+			std::string rt;
+			PARAMS::iterator it = xValue.find(k);
+			if(it!=xValue.end())
+				rt = it->second;
+			return rt;
+		}
 	};
 	struct ReqParam
 	{

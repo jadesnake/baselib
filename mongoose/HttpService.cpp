@@ -195,19 +195,19 @@ namespace HttpService {
 		for(int n=0;n < MG_MAX_HTTP_HEADERS;n++)
 		{
 			CAtlStringA name(hm->header_names[n].p,hm->header_names[n].len);
+			CAtlStringA tV(hm->header_values[n].p,hm->header_values[n].len);
 			name = name.MakeLower();
 			if(name == "content-type")
 			{
-				CAtlStringA tV(hm->header_values[n].p,hm->header_values[n].len);
 				ret.type = tV.GetString();
 				continue;
 			}
 			if(name == "charset")
 			{
-				CAtlStringA tV(hm->header_values[n].p,hm->header_values[n].len);
 				ret.charset = tV.GetString();
 				continue;
 			}
+			ret.xValue.insert(std::make_pair(name.GetString(),tV.GetString()));
 		}
 		if(hm->method.len)
 		{
