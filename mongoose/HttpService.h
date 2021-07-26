@@ -39,6 +39,7 @@ namespace HttpService {
 	};
 	struct ReqParam
 	{
+		PARAMS query;
 		PARAMS params;
 		ReqHead head;
 		std::string body;

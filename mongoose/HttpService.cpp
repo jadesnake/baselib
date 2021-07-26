@@ -2,7 +2,7 @@
 #include "HttpService.h"
 #include "StringUtils/StringUtils.h"
 #include "dir/Dir.h"
-#include "mongoose/mongoose.h"
+#include "mongoose.h"
 #include <Cryptuiapi.h>
 #pragma comment(lib,"Cryptui.lib")
 #pragma comment(lib,"Crypt32.lib")
@@ -290,20 +290,33 @@ namespace HttpService {
 	}
 	ReqParam ParseParam(mg_connection *nc,http_message *hm)
 	{
+		std::string sQuery;
 		ReqParam p;
 		p.head = ParseHead(nc,hm);		 
 		if(hm->body.len)
 			p.body.append(hm->body.p,hm->body.len);
-		else if(hm->query_string.len)
-			p.body.append(hm->query_string.p,hm->query_string.len);
+		if(hm->query_string.len)
+			sQuery.append(hm->query_string.p,hm->query_string.len);
 		std::vector<std::string> params;
+		if(!sQuery.empty())
+		{
+			base::SplitBy(sQuery,'&',params);
+			for(size_t t=0;t<params.size();t++)
+			{
+				OneParam op = ParseForm(params[t]);
+				p.query[op.key] = op.val; 
+			}
+		}
+		params.clear();
 		if(p.head.method=="get" || p.head.type.find("form") != std::string::npos)
 		{
-			if(p.body.size() && base::SplitBy(p.body,'&',params)==0)
+			if(p.body.size() && p.body.find('&')==std::string::npos)
 			{
 				OneParam op = ParseForm(p.body);
 				p.params[op.key] = op.val; 
 			}
+			else
+				base::SplitBy(p.body,'&',params);
 		}
 		else if(p.body.size())
 		{
