@@ -1,6 +1,61 @@
 #include "stdafx.h"
 #include "StringUtils.h"
+#include <sstream>
+#include <Shellapi.h>
+#pragma comment(lib,"Shell32.lib")
 namespace base{
+	int IsTextUTF8(const std::string& txt)
+	{
+		int i=0;
+		DWORD nBytes=0;//UFT8可用1-6个字节编码,ASCII用一个字节
+		unsigned char chr;
+		bool bAllAscii=true; //如果全部都是ASCII, 说明不是UTF-8
+		for(i=0;i<txt.length();i++)
+		{
+			chr=txt[i];
+			if( (chr&0x80) != 0 ) // 判断是否ASCII编码,如果不是,说明有可能是UTF-8,ASCII用7位编码,但用一个字节存,最高位标记为0,o0xxxxxxx
+				bAllAscii= FALSE;
+			if(nBytes==0) //如果不是ASCII码,应该是多字节符,计算字节数
+			{
+				if(chr>=0x80)
+				{
+					if(chr>=0xFC&&chr<=0xFD)
+						nBytes=6;
+					else if(chr>=0xF8)
+						nBytes=5;
+					else if(chr>=0xF0)
+						nBytes=4;
+					else if(chr>=0xE0)
+						nBytes=3;
+					else if(chr>=0xC0)
+						nBytes=2;
+					else
+					{
+						return false;
+					}
+					nBytes--;
+				}
+			}
+			else //多字节符的非首字节,应为 10xxxxxx
+			{
+				if( (chr&0xC0) != 0x80 )
+				{
+					return false;
+				}
+				nBytes--;
+			}
+		}
+		if( nBytes > 0 ) //违返规则
+		{
+			return false;
+		}
+		if( bAllAscii ) //如果全部都是ASCII, 说明不是UTF-8
+		{
+			return false;
+		}
+		return true;
+	}
+	//-------------------------------------------------------------------------------------------------
 	bool IsFullNumberW(const std::wstring&str)
 	{
 		bool bRet = true;
@@ -125,85 +180,32 @@ namespace base{
 		return ret;
 	}
 	//-------------------------------------------------------------------------------------------------
-	std::vector<std::string> GetJsFunParams(const char* jsFun)
+	KeyCmd GetCmdForHash(wchar_t spliter)
 	{
-		std::vector<std::string> ret;
-		const char *p1= strchr(jsFun,'(');
-		const char *p2= strrchr(jsFun,')');
-		if(p1==NULL||p2==NULL)
-			return ret;
-		bool bStr = false;
-		char chFlag = 0;
-		std::string exp(p1+1,p2-p1-1);
-		std::string tmp;
-		exp += ',';
-		for(size_t s=0;s<exp.length();s++)
+		KeyCmd ret;
+		int nNumArgs = 0;
+		LPWSTR *szArglist = CommandLineToArgvW(::GetCommandLine(),&nNumArgs);	
+		if (nNumArgs == 1)
+			return	ret;
+		std::wstring cmd;	//当前指令
+		for (int n = 1; n < nNumArgs;n++)
 		{
-			if(bStr==false&&(exp[s]=='"'||exp[s]=='\'') )
+			std::wstring key,val;
+			LPWSTR nxtArg = szArglist[n];
+			wchar_t *pSp = wcschr(nxtArg,spliter);
+			if(pSp)
 			{
-				chFlag = exp[s];
-				bStr = true;
-				continue;
+				key.append(nxtArg,pSp-nxtArg);
+				val.append(pSp+1);
 			}
-			if(bStr&&chFlag==exp[s])
-			{
-				chFlag = 0;
-				bStr = false;
-				continue;
-			}
-			if(exp[s]==',')
-			{
-				ret.push_back(tmp);
-				tmp.clear();
-				continue;
-			}
-			tmp += exp[s];
+			else
+				key = nxtArg;
+			if(cmd.empty())
+				cmd = key;
+			ret[key] = val;
 		}
+		ret[L"cmdkey"] = cmd;
+		::LocalFree(szArglist);
 		return ret;
 	}
-	//-------------------------------------------------------------------------------------------------
-	std::string GetJsVarStr(const char* var,const std::string& js)
-	{
-		std::string ret,line;
-		std::stringstream ss(js);
-		while(std::getline(ss,line))
-		{
-			std::vector<std::string> exp;
-			if(2==base::SplitBy(line,'=',exp))
-			{
-				if(-1!=exp[0].find(var))
-				{
-					bool bvarVal=false;
-					std::string varVal;
-					char chFlag = 0;
-					for(size_t s=0;s<exp[1].length();s++)
-					{
-						if(exp[1][s]=='"'||exp[1][s]=='\'')
-						{
-							if(bvarVal==false)
-							{
-								bvarVal = true;
-								chFlag = exp[1][s];
-								continue;
-							}
-							else if(chFlag==exp[1][s])
-							{
-								bvarVal = false;
-								break;
-							}
-						}
-						if(bvarVal)
-						{
- 							if(exp[1][s]=='\\')
-							 s+=1;
-							varVal += exp[1][s];
-						}
-					}
-					ret = varVal;
-					break;
-				}
-			}
-		}
-		return ret;
-	} 
 }
