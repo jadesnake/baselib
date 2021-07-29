@@ -161,15 +161,19 @@ namespace SqliteOpt{
 		if(!JsonUtils::ParseJson(sJson,val))
 			return p;
 		std::string index = JsonUtils::SafeJsonValue(val,"index");
+		if(index.empty())
+			index = JsonUtils::SafeJsonValue(val,"page");
 		std::string size = JsonUtils::SafeJsonValue(val,"size");
+		if(size.empty())
+			size = JsonUtils::SafeJsonValue(val,"count");
 		if(!index.empty()&&!size.empty())
 		{
-			int nTmp=0;
-			if(base::StringToInt(index,&nTmp))
-				p.index = nTmp;
-			nTmp = 0;
-			if(base::StringToInt(size,&nTmp))
-				p.size = nTmp;
+			int nTmpA=0,nTmpB=0;
+			if(base::StringToInt(index,&nTmpA) && base::StringToInt(size,&nTmpB))
+			{
+				p.index = nTmpA;
+				p.size = nTmpB;
+			}
 		}
 		return p;
 	}
