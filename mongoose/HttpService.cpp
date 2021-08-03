@@ -296,7 +296,11 @@ namespace HttpService {
 		if(hm->body.len)
 			p.body.append(hm->body.p,hm->body.len);
 		if(hm->query_string.len)
+		{
 			sQuery.append(hm->query_string.p,hm->query_string.len);
+			if(p.body.empty())
+				p.body = sQuery;
+		}
 		std::vector<std::string> params;
 		if(!sQuery.empty())
 		{
