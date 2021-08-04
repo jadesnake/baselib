@@ -901,14 +901,13 @@ CAtlString GetMaxBetysDrive()
 	CAtlString strCurDrive;
 	for (int i = 0; i < driveCount; i++) 
 	{
-		UINT driveType = GetDriveType(lpDriveStr);	
-		if(driveType == DRIVE_FIXED)
+		UINT driveType = GetDriveType(lpDriveStr);
+		DWORD dwAttrs = GetFileAttributes(lpDriveStr);
+		if(driveType==DRIVE_FIXED && ((dwAttrs&FILE_ATTRIBUTE_READONLY)!=FILE_ATTRIBUTE_READONLY) )
 		{
 			CAtlString str ;
 			double dTemp = 0.00;
 			str = lpDriveStr;
-			//v.push_back(str);
-
 			dTemp = GetDriveFreeGB((char*)CT2CA(str));
 			if(dTemp>dMax)
 			{
