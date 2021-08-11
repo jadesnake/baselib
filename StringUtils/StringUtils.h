@@ -8,6 +8,7 @@ namespace base{
 	KeyCmd GetCmdForHash(wchar_t spliter);
 
 	int IsTextUTF8(const std::string& txt);
+	int IsTextGBK(const std::string& txt);
 
 	bool IsFullNumberW(const std::wstring&str);
 

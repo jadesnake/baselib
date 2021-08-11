@@ -4,19 +4,53 @@
 #include <Shellapi.h>
 #pragma comment(lib,"Shell32.lib")
 namespace base{
+	//-------------------------------------------------------------------------------------------------
+	int IsTextGBK(const std::string& txt)
+	{
+		unsigned char chr;
+		DWORD nBytes=0;//GBK2个字符编码
+		bool bAllAscii=true; //如果全部都是ASCII, 说明不是UTF-8
+		for(int i=0;i<txt.length();i++)
+		{
+			chr=txt[i];
+			if( (chr&0x80) != 0 ) // 判断是否ASCII编码,如果不是,说明有可能是UTF-8,ASCII用7位编码,但用一个字节存,最高位标记为0,o0xxxxxxx
+				bAllAscii= FALSE;
+			if(nBytes==0) //如果不是ASCII码,应该是多字节符,计算字节数
+			{	//符号区
+				if(chr>=0xa1 && chr<=0xa9)
+					nBytes=1;
+				//文字区
+				else if(chr>=0xb0 && chr<=0xF7)
+					nBytes=2;
+			}
+			else if(nBytes==1)
+			{
+				if(chr<=0xef)
+					return true;
+			}
+			else if(nBytes==2)
+			{
+				if(chr<=0xfe)
+					return true;
+			}
+		}
+		return false;
+	}
 	int IsTextUTF8(const std::string& txt)
 	{
-		int i=0;
 		DWORD nBytes=0;//UFT8可用1-6个字节编码,ASCII用一个字节
 		unsigned char chr;
 		bool bAllAscii=true; //如果全部都是ASCII, 说明不是UTF-8
-		for(i=0;i<txt.length();i++)
+		char chTxt[2] = {0, 0}; //utf8中文编码为3个字符，如果是2个字符判断一波gbk
+		bool bCheckGBK= false;
+		for(int i=0;i<txt.length();i++)
 		{
 			chr=txt[i];
 			if( (chr&0x80) != 0 ) // 判断是否ASCII编码,如果不是,说明有可能是UTF-8,ASCII用7位编码,但用一个字节存,最高位标记为0,o0xxxxxxx
 				bAllAscii= FALSE;
 			if(nBytes==0) //如果不是ASCII码,应该是多字节符,计算字节数
 			{
+				bCheckGBK = false;
 				if(chr>=0x80)
 				{
 					if(chr>=0xFC&&chr<=0xFD)
@@ -28,7 +62,11 @@ namespace base{
 					else if(chr>=0xE0)
 						nBytes=3;
 					else if(chr>=0xC0)
+					{
 						nBytes=2;
+						chTxt[0] = chr;
+						bCheckGBK = true;
+					}
 					else
 					{
 						return false;
@@ -41,6 +79,12 @@ namespace base{
 				if( (chr&0xC0) != 0x80 )
 				{
 					return false;
+				}
+				if(bCheckGBK)
+				{
+					chTxt[1] = chr;
+					if(IsTextGBK(chTxt))
+						return false;
 				}
 				nBytes--;
 			}
