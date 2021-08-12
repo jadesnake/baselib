@@ -177,6 +177,7 @@ namespace SqliteOpt{
 		}
 		return p;
 	}
+	/*---------------------------------------------------------------------------*/
 	size_t BuildWhereFromJson(const std::string& sJson,SIMPLEWHERES& sw)
 	{
 		Json::Value jvWhere;
@@ -190,6 +191,7 @@ namespace SqliteOpt{
 				one.val = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"value").c_str(),CP_UTF8);
 				one.level = JsonUtils::SafeJsonValueINT(jvWhere[t],"level");
 				one.like = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"like");
+				one.bIN = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"in");
 				sw.push_back(one);
 			}
 		}
@@ -238,23 +240,27 @@ namespace SqliteOpt{
 			CAtlString dbval(it->second.val);
 			if(dbval.IsEmpty())
 				dbval = L"";
-			CAtlString dfval;
+			bool handled = false;
 			if(rw)
 			{
-				dfval = rw->OnReDoX(it->second.key,it->second.val.GetString(),it->second.like);
-				if(!dfval.IsEmpty())
-					wss<<L" "<<dfval.GetString();
-				else
-					continue;
-			}
-			if(dfval.IsEmpty())
-			{
-				wss<<L" "<<it->second.key.GetString();
-				if(it->second.like)
-					wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
-				else
-					wss<<L"='"<<dbval.GetString()<<L"'";
-			}
+				CAtlString dfval = rw->OnReDoX(it->second,handled);
+				if(handled)
+				{
+					if(!dfval.IsEmpty())
+					{
+						wss<<L" "<<dfval.GetString();
+						sqlwhere += wss.str().c_str();
+					}
+  					continue;
+				}
+ 			}
+			wss<<L" "<<it->second.key.GetString();
+			if(it->second.bIN)
+				wss<<L" in ("<<it->second.val.GetString()<<L")";
+			else if(it->second.like)
+				wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
+			else
+				wss<<L"='"<<dbval.GetString()<<L"'";
 			sqlwhere += wss.str().c_str();
  		}
 		if(sqlwhere == L"where")
@@ -284,6 +290,17 @@ namespace SqliteOpt{
 		}
 		sql.Format(L"insert into %s(%s)values(%s);", tbname, keys.str().substr(0,keys.str().length()-1).c_str(), vals.str().substr(0,vals.str().length()-1).c_str());
 		return sql;
+	}
+	bool IsNoPwdDB(CAtlString file,CSQLiteTool* driver)
+	{
+		CppSQLite3DBU db(driver);
+		if(!db.open(file))
+			return false;
+	 	CppSQLite3QueryU rs = db.execQuery(L"select count(*) from sqlite_master;");
+		int nTab = rs.getIntField(0);
+		rs.finalize();
+		db.close();
+		return (nTab>0);
 	}
 	/*---------------------------------------------------------------------------*/
 	Access::Access(HWND win)

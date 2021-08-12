@@ -132,6 +132,8 @@ namespace SqliteOpt{
 	*/
 	bool Save2Bool(CAtlString v);
 	
+	//验证无密码数据库
+	bool IsNoPwdDB(CAtlString file,CSQLiteTool* driver);
 	/*
 		异步执行sql逻辑任务
 	*/
@@ -189,23 +191,27 @@ namespace SqliteOpt{
 		SimpleWhere(){
 			level = 0;
 			like = false;
+			bIN = false;
 		}
 		SimpleWhere(size_t l,CAtlString k,CAtlString v,bool b){
 			level = l;
 			key = k;
 			val = v;
 			like =b;
+			bIN = false;
 		}
 		SimpleWhere(size_t l,CAtlString k,char v,bool b){
 			level = l;
 			key = k;
 			val = v;
 			like =b;
+			bIN = false;
 		}
 		size_t level;	//级别
 		CAtlString key;	//搜索关键字
 		CAtlString val;	//搜索值
 		bool like;	//是否模糊
+		bool bIN;	//范围搜索
 	};
 	//用于对where数据进行重构处理
 	class ReWhereX
@@ -221,8 +227,8 @@ namespace SqliteOpt{
 			@return
 				重构结果
 		*/
-		virtual CAtlString OnReDoX(CAtlString k,CAtlString v,bool like){ 
-			return L""; 
+		virtual CAtlString OnReDoX(const SimpleWhere& sw,bool &handled){ 
+ 			return L""; 
 		}
 	};
 	typedef std::vector<SimpleWhere> SIMPLEWHERES;
@@ -301,6 +307,7 @@ namespace SqliteOpt{
 		virtual ~Access();
 		void SetNoAsync();
 		CAtlString GetFileDB();
+		void TestNoPwd(CAtlString file,CSQLiteTool* driver);
 		void UsePwd(CAtlString pwd);
 		void SetBackupDB(CAtlString backfile);
 		bool Open(CAtlString file,CAtlString driver);
