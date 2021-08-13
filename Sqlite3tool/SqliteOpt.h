@@ -285,7 +285,7 @@ namespace SqliteOpt{
 			if(index<0 || size<0)
 				return offset;
 			long sqlIndex = index;
-			if(sqlIndex == 1)
+			if(sqlIndex >= 1)
 				sqlIndex -= 1;
 			offset.Format(L"limit %d offset %d",size,sqlIndex*size);
 			return offset;
