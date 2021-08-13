@@ -284,7 +284,10 @@ namespace SqliteOpt{
 			CAtlString offset;
 			if(index<0 || size<0)
 				return offset;
-			offset.Format(L"limit %d offset %d",size,index);
+			long sqlIndex = index;
+			if(sqlIndex == 1)
+				sqlIndex -= 1;
+			offset.Format(L"limit %d offset %d",size,sqlIndex*size);
 			return offset;
 		}
 		long index;	//Ë÷Òý
