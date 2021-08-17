@@ -282,7 +282,8 @@ namespace SqliteOpt{
 		for(it;it!=col->end();it++)
 		{
 			keys<<it->first.GetString()<<L",";
-			FormatSql(it->second.name);
+			if(it->second.type!=L"exp")
+				FormatSql(it->second.name);
 			if(it->second.type==L"str")
 				vals << L"'" << it->second.name.GetString() << L"'"<<L",";
 			else
@@ -423,6 +424,20 @@ namespace SqliteOpt{
 	{
 		m_dbBack = backfile;
 	}
+	bool Access::CheckCrypt()
+	{
+		if(m_init==false || m_db==NULL)
+			return false;
+		bool blankDB = false;
+		CppSQLite3QueryU q = m_db->execQuery(L"select count(*) from sqlite_master;");
+		bool br = false;
+		if(q.eof())
+			br = true;
+		else
+			br = false;
+		q.finalize();
+		return br;
+	}
 	bool Access::CheckValid()
 	{
 		if(m_init==false || m_db==NULL)
@@ -460,6 +475,8 @@ namespace SqliteOpt{
 			if(!Open(file,driver))
 				return false;
 		}
+		if(CheckCrypt())
+			return false;
 		CLockGuard guard(&m_lkDBFILE);
 		if(check)
 		{
@@ -491,6 +508,8 @@ namespace SqliteOpt{
 			if(!Open(file,driver))
 				return false;
 		}
+		if(CheckCrypt())
+			return false;
 		CLockGuard guard(&m_lkDBFILE);
  		if(check)
 		{
@@ -537,6 +556,10 @@ namespace SqliteOpt{
 				bRet = m_db->EncryptDB(file,m_pwd);
 			else
 				bRet = m_db->open(file);
+			if(CheckCrypt())
+				return false;
+			if(!CheckValid())
+				return false;
 			m_opened = bRet;
 		}
 		catch (...)

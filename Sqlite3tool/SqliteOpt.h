@@ -326,6 +326,7 @@ namespace SqliteOpt{
 		bool IsOpen();
 		void StartWAL();
 		void SetNsrsh(CAtlString nsrsh);
+		bool CheckCrypt();
 	protected:
 		void* Query(LPCTSTR pClass)
 		{
