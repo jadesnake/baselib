@@ -3,6 +3,7 @@
 #include "jsoncpp/JsonUtils.h"
 #include "StringUtils/NumberConvert.h"
 #include "HelperLog.h"
+#include "dir/Dir.h"
 
 namespace SqliteOpt{
 	CAtlString Bool2Save(bool b)
@@ -475,8 +476,6 @@ namespace SqliteOpt{
 			if(!Open(file,driver))
 				return false;
 		}
-		if(CheckCrypt())
-			return false;
 		CLockGuard guard(&m_lkDBFILE);
 		if(check)
 		{
@@ -508,8 +507,6 @@ namespace SqliteOpt{
 			if(!Open(file,driver))
 				return false;
 		}
-		if(CheckCrypt())
-			return false;
 		CLockGuard guard(&m_lkDBFILE);
  		if(check)
 		{
@@ -539,6 +536,7 @@ namespace SqliteOpt{
 	{
 		CLockGuard guard(&m_lkDBFILE);
 		//初始化sqlite
+		bool fExist = IsPathFind(file);
 		if(m_init==false)
 		{
 			m_db = new CppSQLite3DBU(driver);
@@ -556,11 +554,11 @@ namespace SqliteOpt{
 				bRet = m_db->EncryptDB(file,m_pwd);
 			else
 				bRet = m_db->open(file);
-			if(CheckCrypt())
-				return false;
-			if(!CheckValid())
-				return false;
 			m_opened = bRet;
+			if(m_opened && fExist && CheckCrypt())
+				return false;
+			if(m_opened &&!CheckValid())
+				return false;
 		}
 		catch (...)
 		{
@@ -583,6 +581,7 @@ namespace SqliteOpt{
 	{
 		CLockGuard guard(&m_lkDBFILE);
 		//初始化sqlite
+		bool fExist = IsPathFind(file);
 		if(m_init==false)
 		{
 			m_db = new CppSQLite3DBU(NULL);
@@ -602,6 +601,10 @@ namespace SqliteOpt{
 			else
 				bRet = m_db->open(file);
 			m_opened = bRet;
+			if(m_opened && fExist && CheckCrypt())
+				return false;
+			if(m_opened &&!CheckValid())
+				return false;
 		}
 		catch (...)
 		{
