@@ -193,6 +193,7 @@ namespace SqliteOpt{
 				one.level = JsonUtils::SafeJsonValueINT(jvWhere[t],"level");
 				one.like = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"like");
 				one.bIN = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"in");
+				one.likeOrder = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"likeOrder").c_str(),CP_UTF8);
 				sw.push_back(one);
 			}
 		}
@@ -259,7 +260,14 @@ namespace SqliteOpt{
 			if(it->second.bIN)
 				wss<<L" in ("<<it->second.val.GetString()<<L")";
 			else if(it->second.like)
-				wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
+			{
+				if(it->second.likeOrder.CompareNoCase(L"left")==0)
+					wss<<L" like '%"<<it->second.val.GetString()<<L"'";
+				else if(it->second.likeOrder.CompareNoCase(L"right")==0)
+					wss<<L" like '"<<it->second.val.GetString()<<L"%'";
+				else
+					wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
+			}
 			else
 				wss<<L"='"<<dbval.GetString()<<L"'";
 			sqlwhere += wss.str().c_str();

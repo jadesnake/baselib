@@ -192,6 +192,7 @@ namespace SqliteOpt{
 			level = 0;
 			like = false;
 			bIN = false;
+			likeOrder = L"full";
 		}
 		SimpleWhere(size_t l,CAtlString k,CAtlString v,bool b){
 			level = l;
@@ -199,6 +200,7 @@ namespace SqliteOpt{
 			val = v;
 			like =b;
 			bIN = false;
+			likeOrder = L"full";
 		}
 		SimpleWhere(size_t l,CAtlString k,char v,bool b){
 			level = l;
@@ -206,10 +208,16 @@ namespace SqliteOpt{
 			val = v;
 			like =b;
 			bIN = false;
+			likeOrder = L"full";
+		}
+		inline bool IsFullLike(){
+			if(likeOrder.IsEmpty()||likeOrder.CompareNoCase(L"full"))
+				return true;
 		}
 		size_t level;	//¼¶±ð
 		CAtlString key;	//ËÑË÷¹Ø¼ü×Ö
 		CAtlString val;	//ËÑË÷Öµ
+		CAtlString likeOrder; //Æ¥Åä¹æÔò
 		bool like;	//ÊÇ·ñÄ£ºý
 		bool bIN;	//·¶Î§ËÑË÷
 	};
