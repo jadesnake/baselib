@@ -194,6 +194,17 @@ namespace SqliteOpt{
 				one.like = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"like");
 				one.bIN = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"in");
 				one.likeOrder = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"likeOrder").c_str(),CP_UTF8);
+				if(jvWhere[t].isMember("value"))
+				{
+					if(jvWhere[t]["value"].isNull())
+						one.type = L"null";
+					else if(jvWhere[t]["value"].isString())
+						one.type = L"str";
+					else if(jvWhere[t]["value"].isInt() || jvWhere[t]["value"].isUInt() || jvWhere[t]["value"].isIntegral())
+						one.type = L"int";
+					else if(jvWhere[t]["value"].isBool())
+						one.type = L"bool";
+				}
 				sw.push_back(one);
 			}
 		}
@@ -204,7 +215,15 @@ namespace SqliteOpt{
 			{
 				SqliteOpt::SimpleWhere one;
 				one.key = vit.name().c_str();
-				one.val = JsonUtils::SafeJsonValue(jvWhere,vit.name()).c_str();
+				one.val = JsonUtils::SafeJsonValue(jvWhere,vit.name()).c_str();				
+				if(jvWhere[vit.name()].isNull())
+					one.type = L"null";
+				else if(jvWhere[vit.name()].isString())
+					one.type = L"str";
+				else if(jvWhere[vit.name()].isInt() || jvWhere[vit.name()].isUInt() || jvWhere[vit.name()].isIntegral())
+					one.type = L"int";
+				else if(jvWhere[vit.name()].isBool())
+					one.type = L"bool";
 				sw.push_back(one);
 			}
 		}
@@ -225,7 +244,7 @@ namespace SqliteOpt{
 		for(size_t t=0;t<sw.size();t++)
 		{
 			const SqliteOpt::SimpleWhere *swval = &sw[t];
-			if(swval->val.IsEmpty() || swval->key.IsEmpty())
+			if(swval->key.IsEmpty())
 				continue;
 			if(hashwhere.find(swval->level)==hashwhere.end())
 				hashwhere.insert(std::make_pair(swval->level,*swval));
@@ -239,28 +258,35 @@ namespace SqliteOpt{
 			std::wstringstream wss;
 			if(sqlwhere!=L"where")
 				wss << L" and";
-			CAtlString dbval(it->second.val);
-			if(dbval.IsEmpty())
-				dbval = L"";
+			CAtlString dbval;
+			if(it->second.type==L"null")
+ 				dbval = L" is null";
+ 			else if(it->second.type==L"str" || it->second.type.IsEmpty())
+				dbval.Format(L"'%s'",it->second.val);
+			else
+				dbval = it->second.val;
 			bool handled = false;
 			if(rw)
 			{
-				CAtlString dfval = rw->OnReDoX(it->second,handled);
+				CAtlString hval = rw->OnReDoX(it->second,handled);
 				if(handled)
 				{
-					if(!dfval.IsEmpty())
+					if(!hval.IsEmpty())
 					{
-						wss<<L" "<<dfval.GetString();
+						wss<<L" "<<hval.GetString();
 						sqlwhere += wss.str().c_str();
 					}
   					continue;
 				}
  			}
-			wss<<L" "<<it->second.key.GetString();
 			if(it->second.bIN)
+			{
+				wss<<L" "<<it->second.key.GetString();
 				wss<<L" in ("<<it->second.val.GetString()<<L")";
+			}
 			else if(it->second.like)
 			{
+				wss<<L" "<<it->second.key.GetString();
 				if(it->second.likeOrder.CompareNoCase(L"left")==0)
 					wss<<L" like '%"<<it->second.val.GetString()<<L"'";
 				else if(it->second.likeOrder.CompareNoCase(L"right")==0)
@@ -269,7 +295,15 @@ namespace SqliteOpt{
 					wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
 			}
 			else
-				wss<<L"='"<<dbval.GetString()<<L"'";
+			{
+				if(it->second.type==L"null")
+					wss<<L" ("<<it->second.key.GetString()<<dbval.GetString()<<L" or "<<it->second.key.GetString()<<L"='')";
+				else
+				{
+					wss<<L" "<<it->second.key.GetString();
+					wss<<L"="<<dbval.GetString()<<L"";
+				}
+			}
 			sqlwhere += wss.str().c_str();
  		}
 		if(sqlwhere == L"where")

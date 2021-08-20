@@ -184,7 +184,6 @@ namespace SqliteOpt{
 	};
 	typedef base::IListImpl<Job,CLock> Jobs;
 
-	
 	//简单得查询条件
 	struct SimpleWhere
 	{
@@ -218,6 +217,7 @@ namespace SqliteOpt{
 		CAtlString key;	//搜索关键字
 		CAtlString val;	//搜索值
 		CAtlString likeOrder; //匹配规则
+		CAtlString type; //val类型
 		bool like;	//是否模糊
 		bool bIN;	//范围搜索
 	};
