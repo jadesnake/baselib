@@ -301,6 +301,27 @@ namespace SqliteOpt{
 		sql.Format(L"insert into %s(%s)values(%s);", tbname, keys.str().substr(0,keys.str().length()-1).c_str(), vals.str().substr(0,vals.str().length()-1).c_str());
 		return sql;
 	}
+	CAtlString BuildUpdateSql(CAtlString tbname,Columns *col)
+	{
+		CAtlString sql;
+		std::wstringstream exps;
+		if(tbname.IsEmpty() || col==NULL || col->size()==0)
+			return sql;
+		Columns::iterator it = col->begin();
+		for(it;it!=col->end();it++)
+		{
+			exps<<it->first.GetString()<<L"=";
+			if(it->second.type!=L"exp")
+				FormatSql(it->second.name);
+			if(it->second.type==L"str")
+				exps << L"'" << it->second.name.GetString() << L"'"<<L",";
+			else
+				exps <<it->second.name.GetString()<<L",";
+		}
+		sql.Format(L"update set %s %s", tbname, exps.str().substr(0,exps.str().length()-1).c_str());
+		return sql;
+	}
+	/*---------------------------------------------------------------------------*/
 	bool IsNoPwdDB(CAtlString file,CSQLiteTool* driver)
 	{
 		CppSQLite3DBU db(driver);

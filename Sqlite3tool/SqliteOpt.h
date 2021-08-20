@@ -276,6 +276,16 @@ namespace SqliteOpt{
 			生成sql语句
 	*/
 	CAtlString BuildInsertSql(CAtlString tbname,Columns *col);
+	/*
+		生成update sql语句
+		@inParam 
+			tbname 表名称
+			*col 字段列表
+		@return
+			生成sql语句
+	*/
+	CAtlString BuildUpdateSql(CAtlString tbname,Columns *col);
+
 	//分页参数对象
 	struct Pager
 	{
