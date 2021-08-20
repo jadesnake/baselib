@@ -328,7 +328,14 @@ namespace SqliteOpt{
 			if(it->second.type!=L"exp")
 				FormatSql(it->second.name);
 			if(it->second.type==L"str")
-				vals << L"'" << it->second.name.GetString() << L"'"<<L",";
+			{
+				vals << L"'";
+				if(it->second.name.IsEmpty())
+					vals << L"";
+				else
+					vals << it->second.name.GetString();
+				vals << L"'"<<L",";
+			}
 			else
 				vals <<it->second.name.GetString()<<L",";
 		}

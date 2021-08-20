@@ -24,6 +24,10 @@ namespace SqliteOpt{
 			name = n;
 			type = t;
 		}
+		Column(int n){
+			name.Format(L"%d",n);
+			type = "int";
+		}
 		Column(){
 
 		}
