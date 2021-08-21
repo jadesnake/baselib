@@ -10,6 +10,9 @@
 #include <Psapi.h>
 #include <Cryptuiapi.h>
 #include <ShellAPI.h>
+#include <psapi.h>
+
+#pragma comment(lib, "psapi.lib")
 #pragma comment(lib,"Cryptui.lib")
 #pragma comment(lib,"Crypt32.lib")
 #pragma comment(lib,"Netapi32.lib")
@@ -17,6 +20,47 @@
 
 namespace base	{
 	
+	void SetAutoStart(CAtlString showname,CAtlString exefile)
+	{
+		CAtlString sRegPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+		CAtlString sToolName = showname; 
+		CAtlString sRunCmd;
+		sRunCmd.Format(L"%s -autostart",exefile);		
+		HKEY hKey = NULL;
+		if (RegOpenKeyEx(HKEY_CURRENT_USER, sRegPath, 0, KEY_ALL_ACCESS, &hKey) == ERROR_SUCCESS)
+		{
+			TCHAR strDir[MAX_PATH] = {0};
+			DWORD dwType=0, dwLen=MAX_PATH;
+			long result = RegQueryValueEx(hKey, sToolName, NULL ,&dwType, (BYTE*)strDir, &dwLen);
+			if (result!=ERROR_SUCCESS)
+			{
+				RegSetValueEx(hKey, sToolName, 0, REG_SZ, (LPBYTE)sRunCmd.GetString(),
+					sRunCmd.GetLength()*sizeof(TCHAR));
+			}
+		}
+		RegCloseKey(hKey);
+		HKEY hKey1 = NULL;
+		if(RegOpenKeyEx(HKEY_LOCAL_MACHINE, sRegPath, 0, KEY_ALL_ACCESS, &hKey1) == ERROR_SUCCESS)
+		{
+			TCHAR strDir[MAX_PATH] = {0};
+			DWORD dwType, dwLen = MAX_PATH;
+			long result = RegQueryValueEx(hKey1, sToolName, NULL ,&dwType, (BYTE*)strDir, &dwLen);
+			if (result!=ERROR_SUCCESS)
+			{
+				result = RegSetValueEx(hKey1, sToolName, 0, REG_SZ, (LPBYTE)sRunCmd.GetString(),
+					sRunCmd.GetLength()*sizeof(TCHAR));			
+			}
+		}
+		RegCloseKey(hKey1);
+	}
+	void KillAutoStart(CAtlString showname)
+	{
+		CAtlString sRegPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+		CAtlString sToolName = showname; 
+		RegDeleteKeyValue(HKEY_CURRENT_USER,sRegPath,sToolName);
+		RegDeleteKeyValue(HKEY_LOCAL_MACHINE,sRegPath,sToolName);
+	}
+
 	bool HaveService( const CAtlString &strSrvName )
 	{
 		bool bRet = false;
@@ -711,7 +755,7 @@ namespace base	{
 
 	void  TraceW(LPCWSTR pstrFormat, ...)
 	{
-#ifdef _DEBUG
+//#ifdef _DEBUG
 		wchar_t szBuffer[MAX_TRACEBUF] = { 0 };
 		va_list args;
 		va_start(args, pstrFormat);
@@ -724,7 +768,7 @@ namespace base	{
 			::OutputDebugStringW(szBuffer);
 		}
 		va_end(args);
-#endif
+//#endif
 	}
 
 	BOOL IsWow64()    
@@ -854,6 +898,7 @@ namespace base	{
 							::GetModuleFileNameEx(handle,NULL,chPath,MAX_PATH);
 							CAtlString tmpPath(chPath);
 							tmpPath.Replace('/','\\');
+							
 							if(tmpPath.CompareNoCase(cmpName)==0)
 							{
 								::TerminateProcess(handle,0xdead);

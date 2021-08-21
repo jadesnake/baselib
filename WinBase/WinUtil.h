@@ -6,6 +6,9 @@
 
 namespace base
 {
+	void SetAutoStart(CAtlString showname,CAtlString exefile);
+	void KillAutoStart(CAtlString showname);
+
 	//遍历系统服务列表根据名称判断是否存在目标服务
 	bool HaveService(const CAtlString &strSrvName);
 	//重启服务
