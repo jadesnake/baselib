@@ -35,6 +35,15 @@ namespace curl
 		long savebyte;
 		long databyte;
  	};
+	class CNotify
+	{
+	public:
+		virtual ~CNotify(){	}
+		virtual void OnCurlNotifyRelease() = 0;
+		//总长度，接受的数据长度
+		virtual void OnProgress(__int64 total,__int64 rcvSize) = 0;
+		virtual void OnComplete(bool bSuc,const char* msg) = 0;
+	};
 	class CHttpClient
 	{
 	public:
@@ -117,6 +126,7 @@ namespace curl
 		void		SetEncodeUrl(bool e);
 		long		ReqeustCode();
 		void		ClearAll();
+		void		SetNotify(CNotify *notify);
 		void		SetDebug(CDebug *dbg);
 		CDebug*		GetDebug();
 		void HandleCookie();
@@ -129,6 +139,7 @@ namespace curl
 			SaveHeader,
 		};
 		size_t InsideProc(char *ptr, size_t size, size_t nmemb,Proc proc);
+		size_t InsideProgress(__int64 dltotal,__int64 dlnow,__int64 ultotal, __int64 ulnow);
 		std::string m_rqUrl;
 	protected:
 		std::string encodeParam();
@@ -149,6 +160,7 @@ namespace curl
 		std::stringstream	m_headbuf;
 
 		CDebug *m_dbg;
+		CNotify	*m_notify;
 		bool bHttps;
 		CURLcode pfmCode;	//performcode
 	private:
