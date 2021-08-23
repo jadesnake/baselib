@@ -215,7 +215,7 @@ namespace SqliteOpt{
 			{
 				SqliteOpt::SimpleWhere one;
 				one.key = vit.name().c_str();
-				one.val = JsonUtils::SafeJsonValue(jvWhere,vit.name()).c_str();				
+				one.val = CA2CT(JsonUtils::SafeJsonValue(jvWhere,vit.name()).c_str(),CP_UTF8);
 				if(jvWhere[vit.name()].isNull())
 					one.type = L"null";
 				else if(jvWhere[vit.name()].isString())

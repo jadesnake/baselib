@@ -12,7 +12,7 @@
 #include <ShellAPI.h>
 #include <psapi.h>
 
-#pragma comment(lib, "psapi.lib")
+#pragma comment(lib,"psapi.lib")
 #pragma comment(lib,"Cryptui.lib")
 #pragma comment(lib,"Crypt32.lib")
 #pragma comment(lib,"Netapi32.lib")
@@ -56,10 +56,19 @@ namespace base	{
 	void KillAutoStart(CAtlString showname)
 	{
 		CAtlString sRegPath = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-		CAtlString sToolName = showname; 
-		RegDeleteKeyValue(HKEY_CURRENT_USER,sRegPath,sToolName);
-		RegDeleteKeyValue(HKEY_LOCAL_MACHINE,sRegPath,sToolName);
-	}
+		HKEY hKey = NULL;
+		if(RegOpenKeyEx(HKEY_CURRENT_USER, sRegPath, 0, KEY_ALL_ACCESS, &hKey) == ERROR_SUCCESS)
+		{
+			::RegDeleteValue(hKey,showname);
+			RegCloseKey(hKey);
+		}
+		HKEY hKey1 = NULL;
+		if(RegOpenKeyEx(HKEY_LOCAL_MACHINE, sRegPath, 0, KEY_ALL_ACCESS, &hKey1) == ERROR_SUCCESS)
+		{
+			::RegDeleteValue(hKey1,showname);
+			RegCloseKey(hKey1);
+		}
+ 	}
 
 	bool HaveService( const CAtlString &strSrvName )
 	{
