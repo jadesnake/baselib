@@ -239,7 +239,7 @@ namespace SqliteOpt{
 			@return
 				重构结果
 		*/
-		virtual CAtlString OnReDoX(const SimpleWhere& sw,bool &handled){ 
+		virtual CAtlString OnReDoX(SimpleWhere& sw,bool &handled){ 
  			return L""; 
 		}
 	};

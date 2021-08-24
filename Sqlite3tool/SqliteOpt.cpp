@@ -259,12 +259,6 @@ namespace SqliteOpt{
 			if(sqlwhere!=L"where")
 				wss << L" and";
 			CAtlString dbval;
-			if(it->second.type==L"null")
- 				dbval = L" is null";
- 			else if(it->second.type==L"str" || it->second.type.IsEmpty())
-				dbval.Format(L"'%s'",it->second.val);
-			else
-				dbval = it->second.val;
 			bool handled = false;
 			if(rw)
 			{
@@ -297,7 +291,18 @@ namespace SqliteOpt{
 			else
 			{
 				if(it->second.type==L"null")
-					wss<<L" ("<<it->second.key.GetString()<<dbval.GetString()<<L" or "<<it->second.key.GetString()<<L"='')";
+					dbval = L"null";
+				else
+					dbval = it->second.val;
+				if(it->second.type==L"null")
+				{
+ 					wss<<L" ("<<it->second.key.GetString()<<L" is "<<dbval.GetString()<<L" or "<<it->second.key.GetString()<<L"='')";
+				}
+				else if(it->second.type==L"str" || it->second.type.IsEmpty())
+				{
+					wss<<L" "<<it->second.key.GetString();
+					wss<<L"='"<<dbval.GetString()<<L"'";
+				}
 				else
 				{
 					wss<<L" "<<it->second.key.GetString();
