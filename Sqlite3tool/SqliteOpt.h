@@ -213,6 +213,15 @@ namespace SqliteOpt{
 			bIN = false;
 			likeOrder = L"full";
 		}
+		SimpleWhere(size_t l,CAtlString k,int v){
+			level = l;
+			key = k;
+			val.Format(L"%d",v);
+			like = false;
+			bIN = false;
+			likeOrder = L"full";
+			type = L"int";
+		}
 		inline bool IsFullLike(){
 			if(likeOrder.IsEmpty()||likeOrder.CompareNoCase(L"full"))
 				return true;
