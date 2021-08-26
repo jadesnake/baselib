@@ -36,7 +36,6 @@ namespace SqliteOpt{
 		in.Replace(_T("]"),_T("/]"));
 		in.Replace(_T("%"),_T("/%"));
 		in.Replace(_T("&"),_T("/&"));
-		in.Replace(_T("_"),_T("/_"));
 		in.Replace(_T("("),_T("/("));
 		in.Replace(_T(")"),_T("/)"));
 		return in;
@@ -49,7 +48,6 @@ namespace SqliteOpt{
 		in.Replace(_T("/]"),_T("]"));
 		in.Replace(_T("/%"),_T("%"));
 		in.Replace(_T("/&"),_T("&"));
-		in.Replace(_T("/_"),_T("_"));
 		in.Replace(_T("/("),_T("("));
 		in.Replace(_T("/)"),_T(")"));
 		return in;
@@ -364,7 +362,7 @@ namespace SqliteOpt{
 			else
 				exps <<it->second.name.GetString()<<L",";
 		}
-		sql.Format(L"update set %s %s", tbname, exps.str().substr(0,exps.str().length()-1).c_str());
+		sql.Format(L"update %s set %s", tbname, exps.str().substr(0,exps.str().length()-1).c_str());
 		return sql;
 	}
 	/*---------------------------------------------------------------------------*/
