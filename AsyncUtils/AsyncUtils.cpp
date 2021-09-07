@@ -89,7 +89,7 @@ namespace base
 		int nNum = (sizeof(m_timer)/sizeof(HANDLE));
 		for(int n=0;n<nNum;n++)
 		{
-			if(m_timer[n]==0)
+			if(m_timer[n])
 			{
 				 ::CloseHandle(m_timer[n]);
 				 m_timer[n] = 0;

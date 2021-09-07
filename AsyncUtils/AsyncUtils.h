@@ -121,7 +121,7 @@ namespace base{
 		virtual Status  getStatus();
 		virtual CAtlString getLastError();
 		virtual void UpdateLastError(const CAtlString& v);
-		void* Query(LPCTSTR pClass)
+		virtual void* Query(LPCTSTR pClass)
 		{
 			if(0==_tcscmp(pClass,_T("BackLogicBase")))
 				return this;
