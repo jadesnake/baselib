@@ -36,6 +36,10 @@ namespace base{
 		}
 		return false;
 	}
+	//utf8-3编码范围
+	unsigned char utf8_3[][2] ={{0xA0,0xBF},{0x80,0xBF},{0x80,0x9F},{0x80,0xBF}};
+	//utf8-4编码范围
+	unsigned char utf8_4[][2][2] ={ {{0x90,0xBF},{0x80,0xBF}},{{0x80,0xBF},{0x80,0xBF}},{{0x80,0x8F},{0x80,0xBF}} };
 	int IsTextUTF8(const std::string& txt)
 	{
 		DWORD nBytes=0;//UFT8可用1-6个字节编码,ASCII用一个字节
@@ -43,6 +47,9 @@ namespace base{
 		bool bAllAscii=true; //如果全部都是ASCII, 说明不是UTF-8
 		char chTxt[2] = {0, 0}; //utf8中文编码为3个字符，如果是2个字符判断一波gbk
 		bool bCheckGBK= false;
+		char tbn = '0'; //表类型
+		unsigned int sIndex = 0; //子索引
+		//缺失，5，6编码范围
 		for(int i=0;i<txt.length();i++)
 		{
 			chr=txt[i];
@@ -54,15 +61,69 @@ namespace base{
 				if(chr>=0x80)
 				{
 					if(chr>=0xFC&&chr<=0xFD)
-						nBytes=6;
-					else if(chr>=0xF8)
-						nBytes=5;
-					else if(chr>=0xF0)
-						nBytes=4;
-					else if(chr>=0xE0)
-						nBytes=3;
-					else if(chr>=0xC0)
 					{
+						tbn = '6';
+						chTxt[0] = chr;
+						nBytes=6;
+					}
+					else if(chr>=0xF8)
+					{
+						tbn = '5';
+						chTxt[0] = chr;
+						nBytes=5;
+					}
+					if(chr==0xF0)
+					{
+						tbn = '4';
+						sIndex = 0;
+						chTxt[0] = chr;
+						nBytes=4;
+					}
+					else if(chr>=0xF1&&chr<=0xF3)
+					{
+						tbn = '4';
+						sIndex = 1;
+						chTxt[0] = chr;
+						nBytes=4;
+					}
+					else if(chr==0xF4)
+					{
+						tbn = '4';
+						sIndex = 2;
+						chTxt[0] = chr;
+						nBytes=4;
+					}
+					else if(chr==0xE0)
+					{
+						tbn = '3';
+						sIndex = 0;
+						chTxt[0] = chr;
+						nBytes=3;
+					}
+					else if(chr>=0xE1&&chr<=0xEC)
+					{
+						tbn = '3';
+						sIndex = 1;
+						chTxt[0] = chr;
+						nBytes=3;
+					}
+					else if(chr==0xED)
+					{
+						tbn = '3';
+						sIndex = 2;
+						chTxt[0] = chr;
+						nBytes=3;
+					}
+					else if(chr>=0xEE&&chr<=0xEF)
+					{
+						tbn = '3';
+						sIndex = 3;
+						chTxt[0] = chr;
+						nBytes=3;
+					}
+					else if(chr>=0xC2 && chr<=0xDF)
+					{
+						tbn = '2';
 						nBytes=2;
 						chTxt[0] = chr;
 						bCheckGBK = true;
@@ -80,13 +141,27 @@ namespace base{
 				{
 					return false;
 				}
+				if(nBytes==1&& (chr>=0x80&&chr<=0xBF))
+				{
+					nBytes--;
+					continue;
+				}
+				else if(tbn=='4' && nBytes && chr>=utf8_4[sIndex][3-nBytes][0] && chr<=utf8_4[sIndex][3-nBytes][1])
+				{
+					nBytes--;
+					continue;
+				}
+				else if(tbn=='3' && nBytes && chr>=utf8_3[sIndex][0] && chr<=utf8_3[sIndex][1])
+				{
+					nBytes--;
+					continue;
+				}
 				if(bCheckGBK)
 				{
 					chTxt[1] = chr;
 					if(IsTextGBK(chTxt))
 						return false;
-				}
-				nBytes--;
+				}				
 			}
 		}
 		if( nBytes > 0 ) //违返规则
