@@ -45,10 +45,11 @@ namespace base{
 		DWORD nBytes=0;//UFT8可用1-6个字节编码,ASCII用一个字节
 		unsigned char chr;
 		bool bAllAscii=true; //如果全部都是ASCII, 说明不是UTF-8
-		char chTxt[2] = {0, 0}; //utf8中文编码为3个字符，如果是2个字符判断一波gbk
+		unsigned char chTxt[2] = {0, 0}; //utf8中文编码为3个字符，如果是2个字符判断一波gbk
 		bool bCheckGBK= false;
 		char tbn = '0'; //表类型
 		unsigned int sIndex = 0; //子索引
+		long long nValid=0;	//有效utf8字符数
 		//缺失，5，6编码范围
 		for(int i=0;i<txt.length();i++)
 		{
@@ -137,12 +138,16 @@ namespace base{
 			}
 			else //多字节符的非首字节,应为 10xxxxxx
 			{
+				chTxt[1] = chr;
 				if( (chr&0xC0) != 0x80 )
 				{
 					return false;
 				}
 				if(nBytes==1&& (chr>=0x80&&chr<=0xBF))
 				{
+					//屏蔽 “豫”D4 A5
+					if(0xD4==chTxt[0] && 0xA5==chTxt[1])
+						return false;
 					nBytes--;
 					continue;
 				}
@@ -158,8 +163,7 @@ namespace base{
 				}
 				if(bCheckGBK)
 				{
-					chTxt[1] = chr;
-					if(IsTextGBK(chTxt))
+					if(IsTextGBK(std::string((char*)chTxt,2)));
 						return false;
 				}				
 			}
