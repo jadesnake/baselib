@@ -307,7 +307,7 @@ namespace base{
 	{
 		KeyCmd ret;
 		int nNumArgs = 0;
-		LPWSTR *szArglist = CommandLineToArgvW(::GetCommandLine(),&nNumArgs);	
+		LPWSTR *szArglist = CommandLineToArgvW(::GetCommandLineW(),&nNumArgs);	
 		if (nNumArgs == 1)
 			return	ret;
 		std::wstring cmd;	//µ±«∞÷∏¡Ó
