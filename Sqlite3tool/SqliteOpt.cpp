@@ -2,7 +2,7 @@
 #include "SqliteOpt.h"
 #include "jsoncpp/JsonUtils.h"
 #include "StringUtils/NumberConvert.h"
-#include "HelperLog.h"
+#include "StringUtils/StringUtils.h"
 #include "dir/Dir.h"
 
 namespace SqliteOpt{
@@ -271,40 +271,87 @@ namespace SqliteOpt{
   					continue;
 				}
  			}
-			if(it->second.bIN)
+			std::vector<std::wstring> fKEYS;
+			if(base::SplitByW(it->second.key.GetString(),',',fKEYS)>1)
 			{
-				wss<<L" "<<it->second.key.GetString();
-				wss<<L" in ("<<it->second.val.GetString()<<L")";
-			}
-			else if(it->second.like)
-			{
-				wss<<L" "<<it->second.key.GetString();
-				if(it->second.likeOrder.CompareNoCase(L"left")==0)
-					wss<<L" like '%"<<it->second.val.GetString()<<L"'";
-				else if(it->second.likeOrder.CompareNoCase(L"right")==0)
-					wss<<L" like '"<<it->second.val.GetString()<<L"%'";
-				else
-					wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
+				wss << L" (";
+				for(size_t ik=0;ik<fKEYS.size();ik++)
+				{
+					std::wstring kn = fKEYS[ik];
+					if(it->second.like)
+					{
+						wss<<L" "<<kn.c_str();
+						if(it->second.likeOrder.CompareNoCase(L"left")==0)
+							wss<<L" like '%"<<it->second.val.GetString()<<L"'";
+						else if(it->second.likeOrder.CompareNoCase(L"right")==0)
+							wss<<L" like '"<<it->second.val.GetString()<<L"%'";
+						else
+							wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
+					}
+					else
+					{
+						if(it->second.type==L"null")
+							dbval = L"null";
+						else
+							dbval = it->second.val;
+						if(it->second.type==L"null")
+						{
+							wss<<L" ("<<it->second.key.GetString()<<L" is "<<dbval.GetString()<<L" or "<<it->second.key.GetString()<<L"='')";
+						}
+						else if(it->second.type==L"str" || it->second.type.IsEmpty())
+						{
+							wss<<L" "<<it->second.key.GetString();
+							wss<<L"='"<<dbval.GetString()<<L"'";
+						}
+						else
+						{
+							wss<<L" "<<it->second.key.GetString();
+							wss<<L"="<<dbval.GetString()<<L"";
+						}
+					}
+					if(ik==fKEYS.size()-1)
+						continue;
+					wss << L" or";
+				}
+				wss << L")";
 			}
 			else
 			{
-				if(it->second.type==L"null")
-					dbval = L"null";
-				else
-					dbval = it->second.val;
-				if(it->second.type==L"null")
-				{
- 					wss<<L" ("<<it->second.key.GetString()<<L" is "<<dbval.GetString()<<L" or "<<it->second.key.GetString()<<L"='')";
-				}
-				else if(it->second.type==L"str" || it->second.type.IsEmpty())
+				if(it->second.bIN)
 				{
 					wss<<L" "<<it->second.key.GetString();
-					wss<<L"='"<<dbval.GetString()<<L"'";
+					wss<<L" in ("<<it->second.val.GetString()<<L")";
+				}
+				else if(it->second.like)
+				{
+					wss<<L" "<<it->second.key.GetString();
+					if(it->second.likeOrder.CompareNoCase(L"left")==0)
+						wss<<L" like '%"<<it->second.val.GetString()<<L"'";
+					else if(it->second.likeOrder.CompareNoCase(L"right")==0)
+						wss<<L" like '"<<it->second.val.GetString()<<L"%'";
+					else
+						wss<<L" like '%"<<it->second.val.GetString()<<L"%'";
 				}
 				else
 				{
-					wss<<L" "<<it->second.key.GetString();
-					wss<<L"="<<dbval.GetString()<<L"";
+					if(it->second.type==L"null")
+						dbval = L"null";
+					else
+						dbval = it->second.val;
+					if(it->second.type==L"null")
+					{
+						wss<<L" ("<<it->second.key.GetString()<<L" is "<<dbval.GetString()<<L" or "<<it->second.key.GetString()<<L"='')";
+					}
+					else if(it->second.type==L"str" || it->second.type.IsEmpty())
+					{
+						wss<<L" "<<it->second.key.GetString();
+						wss<<L"='"<<dbval.GetString()<<L"'";
+					}
+					else
+					{
+						wss<<L" "<<it->second.key.GetString();
+						wss<<L"="<<dbval.GetString()<<L"";
+					}
 				}
 			}
 			sqlwhere += wss.str().c_str();
@@ -537,7 +584,9 @@ namespace SqliteOpt{
 				::CopyFile(m_dbBack,file,FALSE);
 			//创建新库
 			if(!Open(file,driver))
-				return false;
+			{
+ 				return false;
+			}
 		}
 		if(!CheckValid())
 		{	//数据库损坏，创建新库
