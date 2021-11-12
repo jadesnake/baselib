@@ -144,7 +144,7 @@ namespace curl
 	protected:
 		std::string encodeParam();
 	protected:
-		typedef std::multimap<std::string, std::string>	mapStrings;
+ 		typedef std::multimap<std::string, std::string>	mapStrings;
 		//应答头部信息
 		std::map<std::string,std::string> m_rpHeaders;
 		long		m_tmOut;

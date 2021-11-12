@@ -421,7 +421,7 @@ namespace base	{
 
 	bool RunAppWithCommand(const wchar_t *application, const wchar_t *command, HANDLE *process)
 	{
-		return RunAppWithRedirection(application, command, NULL, NULL, NULL,false,process);
+		return RunAppWithRedirection(application, command, NULL, NULL, NULL,true,process);
 	}
 
 	bool RunAppWithRedirection(const wchar_t *application,

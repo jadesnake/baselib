@@ -4,66 +4,10 @@
 #include "dir/Dir.h"
 #include "mongoose.h"
 #include <Cryptuiapi.h>
+#include <ShellAPI.h>
 #pragma comment(lib,"Cryptui.lib")
 #pragma comment(lib,"Crypt32.lib")
-
 namespace HttpService {
-	unsigned char ToHex(unsigned char x)
-	{
-		return  x > 9 ? x + 55 : x + 48;
-	}
-
-	unsigned char FromHex(unsigned char x)
-	{
-		unsigned char y;
-		if (x >= 'A' && x <= 'Z') y = x - 'A' + 10;
-		else if (x >= 'a' && x <= 'z') y = x - 'a' + 10;
-		else if (x >= '0' && x <= '9') y = x - '0';
-		return y;
-	}
-
-	std::string UriEncode(const std::string& str)
-	{
-		std::string strTemp = "";
-		size_t length = str.length();
-		for (size_t i = 0; i < length; i++)
-		{
-			if (isalnum((unsigned char)str[i]) ||
-				(str[i] == '-') ||
-				(str[i] == '_') ||
-				(str[i] == '.') ||
-				(str[i] == '~'))
-				strTemp += str[i];
-			else if (str[i] == ' ')
-				strTemp += "+";
-			else
-			{
-				strTemp += '%';
-				strTemp += ToHex((unsigned char)str[i] >> 4);
-				strTemp += ToHex((unsigned char)str[i] % 16);
-			}
-		}
-		return strTemp;
-	}
-
-	std::string UriDecode(const std::string& str)
-	{
-		std::string strTemp = "";
-		size_t length = str.length();
-		for (size_t i = 0; i < length; i++)
-		{
-			if (str[i] == '+') strTemp += ' ';
-			else if (str[i] == '%')
-			{
-				unsigned char high = FromHex((unsigned char)str[++i]);
-				unsigned char low = FromHex((unsigned char)str[++i]);
-				strTemp += high * 16 + low;
-			}
-			else strTemp += str[i];
-		}
-		return strTemp;
-	}
-
 	bool CmdImportCert(CAtlString certfile)
 	{
 		CAtlString cmd;
@@ -106,7 +50,6 @@ namespace HttpService {
 				CertCloseStore(hCertStore,NULL);
 				hCertStore = NULL;
 			}
-
 			if(!CmdImportCert(certfile))
 			{
 				CAtlString   strErr;
@@ -116,10 +59,7 @@ namespace HttpService {
 			}
 		}
 		if(hCertStore)
-		{
 			CertCloseStore(hCertStore,NULL);
-			hCertStore = NULL;
-		}
 		return true;
 	}
 	//为了把mongoose藏起来搞得扩展结构避免类型声明冲突
@@ -229,7 +169,8 @@ namespace HttpService {
 			mMG = NULL;
 		}
 	}
- 	//---------------------------------------------------------------------------------
+	RunParam gRunParam;
+	//---------------------------------------------------------------------------------
 	struct OneParam
 	{
 		std::string key;
@@ -244,7 +185,7 @@ namespace HttpService {
 		else if(q1.size()==2)
 		{
 			ret.key = q1[0];
-			ret.val = UriDecode(q1[1]);
+			ret.val = q1[1];
 		}
 		return ret;
 	}
@@ -263,22 +204,10 @@ namespace HttpService {
 			}
 			if(name == "charset")
 			{
- 				ret.charset = tV.GetString();
+				ret.charset = tV.GetString();
 				continue;
 			}
-			if(name == "accept")
-			{
- 				ret.accept = tV.GetString();
-				continue;
-			}
-			if(name == "origin")
-			{
- 				ret.origin = tV.GetString();
-				ret.xValue.insert(std::make_pair(name,tV));
-				continue;
-			}
-			if(tV.GetLength())
-				ret.xValue.insert(std::make_pair(name,tV));
+			ret.xValue.insert(std::make_pair(name.GetString(),tV.GetString()));
 		}
 		if(hm->method.len)
 		{
@@ -338,10 +267,12 @@ namespace HttpService {
 		size_t nSize = result.response.size();
 		std::stringstream ss;
 		ss << "HTTP/1.1 200 OK\r\n";
-		if(result.rpType.empty())
+		if(result.type.empty())
+			ss << "Content-Type:application/json;charset=UTF-8\r\n";
+		else if(result.type.find("text")!=std::string::npos)
 			ss << "Content-Type:text/html;charset=UTF-8\r\n";
 		else
-			ss << "Content-Type:" << result.rpType.c_str() << ";charset=UTF-8\r\n";
+			ss << "Content-Type:"<<result.type.c_str()<<";charset=UTF-8\r\n";
 		ss << "Access-Control-Allow-Origin: *\r\n";
 		ss << "Access-Control-Allow-Methods:*\r\n";
 		ss << "Access-Control-Allow-Credentials:true\r\n";
@@ -351,6 +282,8 @@ namespace HttpService {
 			<< "\r\n";
 		mg_printf(nc, "%s", ss.str().c_str());
 		mg_send(nc,result.response.c_str(),result.response.size());
+		//if(gRunParam.GetMG())
+		//	mg_serve_http(nc, hm, gRunParam.GetMG()->s_http_server_opts); /* Serve static content */
 	}
 	std::string MakeDefaultJson(bool ok)
 	{
@@ -393,14 +326,15 @@ namespace HttpService {
 						result.response = MakeDefaultJson(false);
 					ResponseContent(nc,hm,result,origin);
 				}
+				//if(gRunParam.GetMG())
+				//	mg_serve_http(nc, hm, gRunParam.GetMG()->s_http_server_opts);
 			}
 			break;
 		default:
 			break;
 		}
 	}
-	/*------------------------------------------------------------------------------------------------*/
-	bool Service::BindHander(Handler *handler)
+	bool BindHander(Handler *handler)
 	{
 		if(!gRunParam.GetMG())
 			return false;
@@ -415,14 +349,10 @@ namespace HttpService {
 				::SetEvent(gRunParam.evRun);
 			return false;
 		}
-		handler->OnInit(&gRunParam);
 		return true;
 	}
-	void Service::Stop()
-	{
-		gRunParam.Stop();
-	}
-	bool Service::Run(void)
+
+	bool Run(void)
 	{
 		if(!gRunParam.GetMG())
 			return false;
@@ -439,7 +369,7 @@ namespace HttpService {
  		for (;;) 
 		{
 			if(gRunParam.GetMG())
-				gRunParam.GetMG()->pool(2000);
+				gRunParam.GetMG()->pool(1000);
 			if(bFire==false && gRunParam.evReady)
 			{
 				::SetEvent(gRunParam.evReady);

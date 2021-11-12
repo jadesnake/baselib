@@ -39,7 +39,8 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 	std::stringstream ss;
 	ss<<size<<"\n";
 	fSuccess = WriteFile(mPipe,ss.str().c_str(),ss.str().size(),&cbWritten,NULL);
-	if(GetLastError()==ERROR_BROKEN_PIPE)
+	DWORD dwErr = GetLastError();
+	if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA)
 	{
 		mLastMsg = L"pipe disconnected";
 		mClosed = true;
@@ -55,7 +56,8 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 	{
 		DWORD sendbytes=0;
 		fSuccess = WriteFile(mPipe,buf+cbWritten,size-cbWritten,&sendbytes,NULL);
-		if(GetLastError()==ERROR_BROKEN_PIPE)
+		dwErr = GetLastError();
+		if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA)
 		{
 			mLastMsg = L"pipe disconnected";
 			mClosed = true;
@@ -76,11 +78,11 @@ bool NamedPipe::ReadLine(std::string& outBuf)
 	DWORD cbBytesRead=0,needBytes=0,lastCode=0;
 	BOOL fSuccess = FALSE;
 	bool bPacket = false;
-	std::string rcvBuffer;
+	std::string rcvBuffer,lenBuffer;
 	while(1)
 	{
-		memset(mRcvData,0,BUFFER_PIPE_SIZE);
-		fSuccess = ReadFile(mPipe,mRcvData, BUFFER_PIPE_SIZE, &cbBytesRead,NULL);
+		char chBuf = 0;
+		fSuccess = ReadFile(mPipe,&chBuf, 1, &cbBytesRead,NULL);
 		lastCode = GetLastError();
 		if(lastCode== ERROR_BROKEN_PIPE)
 		{
@@ -95,40 +97,21 @@ bool NamedPipe::ReadLine(std::string& outBuf)
 			mLastMsg = L"read zero length";
 			return false;
 		}
-		if(bPacket==false)
-		{
-			size_t nIdex = 0;
-			for(nIdex=0;nIdex<cbBytesRead;nIdex++)
-			{
-				if(mRcvData[nIdex] == '\n')
-				{
-					bPacket = true;
-					rcvBuffer.append(mRcvData,nIdex);
-					needBytes = atol(rcvBuffer.c_str());
-					rcvBuffer.clear();
-					//收到的实体数据
-					DWORD lenData = cbBytesRead-nIdex-1;
-					if(lenData)
- 						rcvBuffer.append(mRcvData+nIdex+1,lenData);
- 					if(lenData > needBytes)
-					{	//数据发多了？
-						mLastMsg = L"recv more data?";
-					}
-					needBytes -= lenData;
-					break; //收到数据头
-				}
-			}
-			if(nIdex && bPacket==false)
-				rcvBuffer.append(mRcvData,nIdex);
+		if(chBuf!='\n')
+		{		
+			lenBuffer += chBuf;
+			continue;
 		}
-		//得到数据头
-		if(bPacket)	break;
+		needBytes = atol(lenBuffer.c_str());
+		bPacket = true;
+		break;
 	}
 	if(needBytes==0)
 	{
 		outBuf = rcvBuffer;
 		return true;
 	}
+	lenBuffer = rcvBuffer;
 	while(bPacket && needBytes)
 	{
 		memset(mRcvData,0,BUFFER_PIPE_SIZE);

@@ -182,8 +182,7 @@ void CppSQLite3DBU::InitParam()
 	//CSQLiteTool::Get()->ExecuteSQL(mpDB, "PRAGMA journal_mode = WAL;", NULL, 0, 0); 
 	if(mSqlTool->ExecuteSQL(mpDB, "PRAGMA encoding=UTF8;", NULL, 0, 0))
 		GetLastMsg();
-	if(mSqlTool->ExecuteSQL(mpDB, "PRAGMA synchronous=FULL;", NULL, 0, 0))
-		GetLastMsg();
+	//mSqlTool->ExecuteSQL(mpDB, "PRAGMA synchronous=FULL;", NULL, 0, 0);
 }
 bool CppSQLite3DBU::backup(const CppSQLite3DBU &from,LPCTSTR dbNM)
 {
@@ -233,11 +232,6 @@ bool CppSQLite3DBU::EncryptDB(LPCTSTR szDBFile,LPCTSTR szKey)
 	}
 	InitParam();
 	lastMsg = lastMsg.MakeLower();
-	if(lastMsg.Find(L"file is encrypted or is not a database")!=-1)
-	{	//数据库打开失败，兼容部分驱动setkey返回值异常
-		close();
-		return false;
-	}
 	return true;
 }
 bool CppSQLite3DBU::ResetKeyDB(LPCTSTR szKey)

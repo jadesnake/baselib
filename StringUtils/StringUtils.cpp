@@ -200,7 +200,7 @@ namespace base{
 		if(sEnd==0)
 			return "";
 		sEnd -= 1;
-		for(size_t t=0;t<ret.size();t++)
+		for(size_t t=0;t<(ret.size()-1);t++)
 			ss << ret[t].c_str() << delim;
 		ss << ret[sEnd].c_str();
 		return ss.str();
@@ -212,7 +212,7 @@ namespace base{
 		if(sEnd==0)
 			return L"";
 		sEnd -= 1;
-		for(size_t t=0;t<ret.size();t++)
+		for(size_t t=0;t<(ret.size()-1);t++)
 			ss << ret[t].c_str() << delim;
 		ss << ret[sEnd].c_str();
 		return ss.str();

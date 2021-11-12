@@ -41,6 +41,9 @@ namespace base{
 	public:
 		//获取当前月天数
 		int GetMonthDays();
+
+		//根据年月获取天数
+		int GetMonthDays(const ATL::CAtlString strTime);
 		//获取某年某月天数
 		static int GetMonthDays(int y,int m);
 		//基于基姆拉尔森计算公式

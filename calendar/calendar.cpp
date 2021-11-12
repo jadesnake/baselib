@@ -47,6 +47,12 @@ namespace base
 	{
 		return Calendar::GetMonthDays(ATL::CTime::GetYear(), ATL::CTime::GetMonth());
 	}
+
+	int Calendar::GetMonthDays(const ATL::CAtlString strTime){
+      SYSTEMTIME svrDateTime = ParseDateTime(CT2CA(strTime).m_psz,"yyyy-MM");
+      return Calendar::GetMonthDays(svrDateTime.wYear,svrDateTime.wMonth);
+	}
+
 	int Calendar::GetMonthDays(int y,int m)
 	{
 		int nRet = 0;
@@ -70,7 +76,7 @@ namespace base
 		if (m == 1 || m == 2) {
 			m += 12;
 			y--;
-		}
+		} 
 		int iWeek = (d + 2 * m + 3 * (m + 1) / 5 + y + y / 4 - y / 100 + y / 400) % 7;
 		iWeek += 1;	//0 -- 周一；7 -- 星期日
 		return iWeek;

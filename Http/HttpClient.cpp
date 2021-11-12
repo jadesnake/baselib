@@ -486,7 +486,8 @@ namespace curl {
 	void	CHttpClient::PerformParam(const std::string& url)
 	{
 		m_chunked = false;
-		curl_easy_reset(m_url);
+		if(m_rqUrl!=url && m_url)
+			curl_easy_reset(m_url);
 		m_wbuf.clear();	//清除操作标记，如 输入输出流指针
 		m_wbuf.str("");
 		m_wbuf.flush();
@@ -559,10 +560,9 @@ namespace curl {
 		//curl_easy_setopt(m_url, CURLOPT_COOKIEFILE, "curl.cookie");
 		//curl_easy_setopt(m_url, CURLOPT_ACCEPT_ENCODING, "zh-CN,zh;q=0.8");
 		//keep alive
-		//curl_easy_setopt(m_url, CURLOPT_TCP_KEEPALIVE, 1L);
-		//curl_easy_setopt(m_url, CURLOPT_TCP_KEEPIDLE, 120L);
-		//curl_easy_setopt(m_url, CURLOPT_TCP_KEEPINTVL, 60L);
-
+		curl_easy_setopt(m_url, CURLOPT_TCP_KEEPALIVE, 1L);
+		curl_easy_setopt(m_url, CURLOPT_TCP_KEEPIDLE, 120L);
+		curl_easy_setopt(m_url, CURLOPT_TCP_KEEPINTVL, 60L);
 		if (m_Save2File)
 		{
 			curl_easy_setopt(m_url, CURLOPT_WRITEFUNCTION, StreamSaveFile);

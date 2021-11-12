@@ -299,7 +299,7 @@ CAtlString GetAppPath()
 	return filename;
 }
 
-CAtlString getAppFilePath()
+CAtlString GetAppFilePath()
 {
 	TCHAR sFilename[_MAX_PATH];
 	TCHAR sDrive[_MAX_DRIVE];
@@ -882,7 +882,31 @@ double GetDriveFreeGB(LPSTR drive)
 	dFreeGBs = i64FreeBytes*9.3132e-10;
 	return dFreeGBs;
 }
-CAtlString GetMaxBetysDrive()
+
+bool IsWriterPath(const CAtlString &fullpath)
+{
+	int nFlags = fullpath.Find(L":");
+	if(nFlags==-1)
+		return false;
+	CAtlString driver = fullpath.Mid(0,nFlags+1)+'\\';
+	TCHAR chSysName[MAX_PATH+1];
+	UINT driveType = GetDriveType(driver);
+	DWORD dwAttrs = GetFileAttributes(driver);
+	if(GetVolumeInformation(driver,NULL,0,NULL,NULL,NULL,chSysName,MAX_PATH+1))
+	{
+		//Ìø¹ý°¢ÀïÔÆÅÌ
+		CAtlString cmpTmp(chSysName);
+		if(cmpTmp.CompareNoCase(L"cloudfs")==0)
+			return false;
+	}
+	if(driveType!=DRIVE_FIXED)
+		return false;
+	if((dwAttrs&FILE_ATTRIBUTE_READONLY)==FILE_ATTRIBUTE_READONLY)
+		return false;
+	return true;
+}
+
+CAtlString GetMaxBetysDrive(CAtlString badRoot)
 {
 	int driveCount = 0;
 	DWORD driveInfo = GetLogicalDrives();
@@ -901,9 +925,9 @@ CAtlString GetMaxBetysDrive()
 	CAtlString strCurDrive;
 	for (int i = 0; i < driveCount; i++) 
 	{
-		UINT driveType = GetDriveType(lpDriveStr);
-		DWORD dwAttrs = GetFileAttributes(lpDriveStr);
-		if(driveType==DRIVE_FIXED && ((dwAttrs&FILE_ATTRIBUTE_READONLY)!=FILE_ATTRIBUTE_READONLY) )
+		if(badRoot.Find(lpDriveStr)!=-1)
+			continue;
+		if(IsWriterPath(lpDriveStr))
 		{
 			CAtlString str ;
 			double dTemp = 0.00;

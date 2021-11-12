@@ -56,7 +56,7 @@ CSimpleArray<CAtlString> GetFileListFromDir(CAtlString path, BOOL recursive=FALS
 
 //获取程序所在目录
 CAtlString GetAppPath();
-CAtlString getAppFilePath();
+CAtlString GetAppFilePath();
 //获取动态连接库(dll）所在路径
 //pszFileName:dll文件名(不包含路径)
 CAtlString GetDllPath(LPCTSTR pszFileName);
@@ -138,4 +138,6 @@ bool GetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
 
 bool ResetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
 
-CAtlString GetMaxBetysDrive();
+CAtlString GetMaxBetysDrive(CAtlString badRoot);
+
+bool IsWriterPath(const CAtlString &fullpath);

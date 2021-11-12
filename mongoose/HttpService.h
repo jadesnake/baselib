@@ -33,40 +33,34 @@ namespace HttpService {
 		std::string type;
 		std::string charset;
 		std::string method;
-		std::string accept;
-		std::string origin;
-		PARAMS	xValue;
+		PARAMS xValue;
+		std::string findX(const std::string& k)
+		{
+			std::string rt;
+			PARAMS::iterator it = xValue.find(k);
+			if(it!=xValue.end())
+				rt = it->second;
+			return rt;
+		}
 	};
 	struct ReqParam
 	{
-		PARAMS query;
 		PARAMS params;
+		PARAMS query;
 		ReqHead head;
 		std::string body;
-		inline std::string GetParamVal(const std::string& key){
-			std::string blank;
-			PARAMS::iterator it = params.find(key);
-			if(it==params.end())
-				return blank;
-			return it->second;
-		}
 	};
 	struct Result
 	{
 		bool bNext;	//是否执行下一步处理逻辑，如：OnRequest
-		std::string rpType;	//返回报文格式
+		std::string type;	//返回报文格式
 		std::string response; //返回报文
 	};
-
-	//uri 编解码
-	std::string UriEncode(const std::string& str);
-	std::string UriDecode(const std::string& str);
 
 	class Handler
 	{
 	public:
 		virtual ~Handler(){	}
-		virtual void OnInit(RunParam *runParam){ }
 		virtual Result OnHeader(const std::string& uri,const ReqHead& type)
 		{
 			Result ret;
@@ -76,12 +70,8 @@ namespace HttpService {
 		virtual Result OnRequest(const std::string& uri,const ReqParam& param)=0;
 		virtual void OnIdle(){ };
 	};
-	class Service
-	{
-	public:
-		bool BindHander(Handler *handler);
-		bool Run(void);
-		void Stop();
-		RunParam gRunParam;
-	};
+	bool BindHander(Handler *handler);
+	bool Run(void);
+
+	extern RunParam gRunParam;
 };
