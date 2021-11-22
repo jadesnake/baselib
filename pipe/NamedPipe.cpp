@@ -6,17 +6,23 @@ NamedPipe::NamedPipe(void)
 	mIdentity = BLANK;
 	mPipe = NULL;
 	mClosed = false;
+	memset(&mReadEvent,0,sizeof(OVERLAPPED));
+	mReadEvent.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
 }
 NamedPipe::NamedPipe(HANDLE hPipe)
 {
 	mPipe = hPipe;
 	mIdentity = RCVCLIENT;
 	mClosed = false;
+	memset(&mReadEvent,0,sizeof(OVERLAPPED));
+	mReadEvent.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
 }
 NamedPipe::~NamedPipe(void)
 {
 	if(mIdentity==RCVCLIENT)
 		close();
+	if(mReadEvent.hEvent)
+		::CloseHandle(mReadEvent.hEvent);
 }
 void NamedPipe::close()
 {
@@ -40,7 +46,7 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 	ss<<size<<"\n";
 	fSuccess = WriteFile(mPipe,ss.str().c_str(),ss.str().size(),&cbWritten,NULL);
 	DWORD dwErr = GetLastError();
-	if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA)
+	if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA||dwErr==ERROR_INVALID_HANDLE)
 	{
 		mLastMsg = L"pipe disconnected";
 		mClosed = true;
@@ -57,7 +63,7 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 		DWORD sendbytes=0;
 		fSuccess = WriteFile(mPipe,buf+cbWritten,size-cbWritten,&sendbytes,NULL);
 		dwErr = GetLastError();
-		if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA)
+		if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA||dwErr==ERROR_INVALID_HANDLE)
 		{
 			mLastMsg = L"pipe disconnected";
 			mClosed = true;
@@ -76,25 +82,24 @@ bool NamedPipe::ReadLine(std::string& outBuf)
 {
 	mLastMsg.Empty();
 	DWORD cbBytesRead=0,needBytes=0,lastCode=0;
-	BOOL fSuccess = FALSE;
-	bool bPacket = false;
+ 	bool bPacket = false;
 	std::string rcvBuffer,lenBuffer;
 	while(1)
 	{
 		char chBuf = 0;
-		fSuccess = ReadFile(mPipe,&chBuf, 1, &cbBytesRead,NULL);
+		ReadFile(mPipe,&chBuf, 1, &cbBytesRead, &mReadEvent);
 		lastCode = GetLastError();
-		if(lastCode== ERROR_BROKEN_PIPE)
+		if(lastCode== ERROR_BROKEN_PIPE||lastCode==ERROR_INVALID_HANDLE)
 		{
 			mLastMsg = L"pipe disconnected";
 			mClosed = true;
 			return false;
 		}
-		if(fSuccess==0)
-			break;
+		int nEvType = WaitForSingleObject(mReadEvent.hEvent, INFINITE);
 		if(cbBytesRead==0)
 		{
 			mLastMsg = L"read zero length";
+			mClosed = true;
 			return false;
 		}
 		if(chBuf!='\n')
@@ -115,19 +120,19 @@ bool NamedPipe::ReadLine(std::string& outBuf)
 	while(bPacket && needBytes)
 	{
 		memset(mRcvData,0,BUFFER_PIPE_SIZE);
-		fSuccess = ReadFile(mPipe,mRcvData, needBytes, &cbBytesRead,NULL);
+		ReadFile(mPipe,mRcvData, needBytes, &cbBytesRead, &mReadEvent);
 		DWORD lastCode = GetLastError();
-		if(lastCode== ERROR_BROKEN_PIPE)
+		if(lastCode== ERROR_BROKEN_PIPE||lastCode==ERROR_INVALID_HANDLE)
 		{
 			mLastMsg = L"pipe disconnected";
 			mClosed = true;
 			return false;
 		}
-		if(fSuccess==0)
-			break;
+		int nEvType = WaitForSingleObject(mReadEvent.hEvent, INFINITE);
 		if(cbBytesRead==0)
 		{
 			mLastMsg = L"read zero length";
+			mClosed = true;
 			return false;
 		}
 		rcvBuffer.append(mRcvData,cbBytesRead);
@@ -168,7 +173,7 @@ bool NamedPipe::connect(LPCTSTR named)
 			0,              // no sharing 
 			NULL,           // default security attributes
 			OPEN_EXISTING,  // opens existing pipe 
-			0,              // default attributes 
+			FILE_FLAG_OVERLAPPED,              // default attributes 
 			NULL);          // no template file
 		DWORD errCode = GetLastError();
 		if(errCode==ERROR_PIPE_BUSY)
@@ -248,7 +253,7 @@ NamedPipe* NamedPipe::WaitClient(unsigned int timeout)
 	if(ConnectNamedPipe(mPipe, &lpOverlapped)==0)
 	{
 		DWORD dwCode = GetLastError();
-		if(dwCode==ERROR_PIPE_CONNECTED)
+		if(dwCode==ERROR_PIPE_CONNECTED||dwCode==ERROR_INVALID_HANDLE)
 		{
 			if (!SetEvent(lpOverlapped.hEvent))
 			{

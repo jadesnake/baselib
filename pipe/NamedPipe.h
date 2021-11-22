@@ -32,4 +32,5 @@ private:
 	IDENTITY mIdentity;
 	CAtlString mLastMsg;
 	CAtlString mNamed;
+	OVERLAPPED mReadEvent;
 };
