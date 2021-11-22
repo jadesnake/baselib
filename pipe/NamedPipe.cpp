@@ -96,10 +96,16 @@ bool NamedPipe::ReadLine(std::string& outBuf)
 			return false;
 		}
 		int nEvType = WaitForSingleObject(mReadEvent.hEvent, INFINITE);
+		if(!::GetOverlappedResult(mPipe, &mReadEvent, &cbBytesRead, INFINITE))
+		{
+			lastCode = GetLastError();
+			mLastMsg = L"pipe disconnected";
+			mClosed = true;
+			return false;
+		}
 		if(cbBytesRead==0)
 		{
 			mLastMsg = L"read zero length";
-			mClosed = true;
 			return false;
 		}
 		if(chBuf!='\n')
@@ -129,6 +135,13 @@ bool NamedPipe::ReadLine(std::string& outBuf)
 			return false;
 		}
 		int nEvType = WaitForSingleObject(mReadEvent.hEvent, INFINITE);
+		if(!::GetOverlappedResult(mPipe, &mReadEvent, &cbBytesRead, INFINITE))
+		{
+			lastCode = GetLastError();
+			mLastMsg = L"pipe disconnected";
+			mClosed = true;
+			return false;
+		}
 		if(cbBytesRead==0)
 		{
 			mLastMsg = L"read zero length";
