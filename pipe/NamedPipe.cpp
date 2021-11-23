@@ -7,7 +7,9 @@ NamedPipe::NamedPipe(void)
 	mPipe = NULL;
 	mClosed = false;
 	memset(&mReadEvent,0,sizeof(OVERLAPPED));
+	memset(&mWriteEvent,0,sizeof(OVERLAPPED));
 	mReadEvent.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
+	mWriteEvent.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
 }
 NamedPipe::NamedPipe(HANDLE hPipe)
 {
@@ -15,7 +17,9 @@ NamedPipe::NamedPipe(HANDLE hPipe)
 	mIdentity = RCVCLIENT;
 	mClosed = false;
 	memset(&mReadEvent,0,sizeof(OVERLAPPED));
+	memset(&mWriteEvent,0,sizeof(OVERLAPPED));
 	mReadEvent.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
+	mWriteEvent.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
 }
 NamedPipe::~NamedPipe(void)
 {
@@ -23,6 +27,8 @@ NamedPipe::~NamedPipe(void)
 		close();
 	if(mReadEvent.hEvent)
 		::CloseHandle(mReadEvent.hEvent);
+	if(mWriteEvent.hEvent)
+		::CloseHandle(mWriteEvent.hEvent);
 }
 void NamedPipe::close()
 {
@@ -44,7 +50,7 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 	//先发送数据长度
 	std::stringstream ss;
 	ss<<size<<"\n";
-	fSuccess = WriteFile(mPipe,ss.str().c_str(),ss.str().size(),&cbWritten,NULL);
+	fSuccess = WriteFile(mPipe,ss.str().c_str(),ss.str().size(),&cbWritten,&mWriteEvent);
 	DWORD dwErr = GetLastError();
 	if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA||dwErr==ERROR_INVALID_HANDLE)
 	{
@@ -52,7 +58,9 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 		mClosed = true;
 		return false;
 	}
-	if(!fSuccess || ss.str().size()!=cbWritten)
+	::WaitForSingleObject(mWriteEvent.hEvent,INFINITE);
+	::GetOverlappedResult(mPipe,&mWriteEvent,&cbWritten,TRUE);
+	if(ss.str().size()!=cbWritten)
 	{
 		mLastMsg = L"WriteFile failed";
 		return false;
@@ -61,7 +69,7 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 	do
 	{
 		DWORD sendbytes=0;
-		fSuccess = WriteFile(mPipe,buf+cbWritten,size-cbWritten,&sendbytes,NULL);
+		fSuccess = WriteFile(mPipe,buf+cbWritten,size-cbWritten,&sendbytes,&mWriteEvent);
 		dwErr = GetLastError();
 		if(dwErr==ERROR_BROKEN_PIPE||dwErr==ERROR_NO_DATA||dwErr==ERROR_INVALID_HANDLE)
 		{
@@ -69,6 +77,8 @@ bool NamedPipe::WriteBytes(const char* buf,size_t size)
 			mClosed = true;
 			return false;
 		}
+		::WaitForSingleObject(mWriteEvent.hEvent,INFINITE);
+		::GetOverlappedResult(mPipe,&mWriteEvent,&sendbytes,TRUE);
 		if(!fSuccess)
 		{
 			mLastMsg = L"WriteFile failed";

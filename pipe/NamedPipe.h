@@ -33,4 +33,5 @@ private:
 	CAtlString mLastMsg;
 	CAtlString mNamed;
 	OVERLAPPED mReadEvent;
+	OVERLAPPED mWriteEvent;
 };
