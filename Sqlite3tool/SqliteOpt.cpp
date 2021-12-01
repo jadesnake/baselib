@@ -181,11 +181,30 @@ namespace SqliteOpt{
 	{
 		Json::Value jvWhere;
 		JsonUtils::ParseJson(sJson,jvWhere);
+		std::wstringstream orderup,orderdown;
 		if(jvWhere.isArray())
 		{
 			for(size_t t=0;t<jvWhere.size();t++)
 			{
 				SqliteOpt::SimpleWhere one;
+				CAtlString orderUp = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"orderUp").c_str(),CP_UTF8);
+				CAtlString orderDown = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"orderDown").c_str(),CP_UTF8);
+				if(!orderUp.IsEmpty() || !orderDown.IsEmpty())
+				{
+					if(!orderUp.IsEmpty())
+					{
+						if(!orderup.str().empty())
+							orderup << ',';
+						orderup << orderUp.GetString() << L" ASC";
+					}
+					if(!orderDown.IsEmpty())
+					{
+						if(!orderdown.str().empty())
+							orderdown << ',';
+						orderdown << orderDown.GetString() << L" DESC";
+					}
+					continue;
+				}				
 				one.key = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"key").c_str(),CP_UTF8);
 				one.val = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"value").c_str(),CP_UTF8);
 				one.level = JsonUtils::SafeJsonValueINT(jvWhere[t],"level");
@@ -214,6 +233,20 @@ namespace SqliteOpt{
 				SqliteOpt::SimpleWhere one;
 				one.key = vit.name().c_str();
 				one.val = CA2CT(JsonUtils::SafeJsonValue(jvWhere,vit.name()).c_str(),CP_UTF8);
+				if(one.key==L"orderUp" && !one.val.IsEmpty())
+				{
+					if(!orderup.str().empty())
+						orderup << ',';
+					orderup << one.val.GetString() << L" ASC";
+					continue;
+				}
+				else if(one.key==L"orderDown" && !one.val.IsEmpty())
+				{
+					if(!orderdown.str().empty())
+						orderdown << ',';
+					orderdown << one.val.GetString() << L" DESC";
+					continue;
+				}
 				if(jvWhere[vit.name()].isNull())
 					one.type = L"null";
 				else if(jvWhere[vit.name()].isString())
@@ -221,10 +254,14 @@ namespace SqliteOpt{
 				else if(jvWhere[vit.name()].isInt() || jvWhere[vit.name()].isUInt() || jvWhere[vit.name()].isIntegral())
 					one.type = L"int";
 				else if(jvWhere[vit.name()].isBool())
-					one.type = L"bool";
+					one.type = L"bool";				
 				sw.push_back(one);
 			}
 		}
+		if(!orderup.str().empty())
+			sw.OrderUp = orderup.str().c_str();
+		if(!orderdown.str().empty())
+			sw.OrderDown = orderdown.str().c_str();
 		return sw.size();
 	}
 	CAtlString BuildReWhereX(const SIMPLEWHERES& sw,ReWhereX *rw)
@@ -250,6 +287,8 @@ namespace SqliteOpt{
 				hashwhere.insert(std::make_pair(hashwhere.size(),*swval));
 		}
 		if(hashwhere.size()==0)	return L"";
+		std::wstringstream orderby;
+		orderby << " ORDER BY ";
 		std::map<size_t,SqliteOpt::SimpleWhere,sortByKey>::iterator it = hashwhere.begin();
 		for(it;it!=hashwhere.end();it++)
 		{
@@ -358,7 +397,19 @@ namespace SqliteOpt{
  		}
 		if(sqlwhere == L"where")
 			return L"";
-		return sqlwhere;
+		if(!sw.OrderDown.IsEmpty() || !sw.OrderUp.IsEmpty())
+		{
+			if(!sw.OrderDown.IsEmpty())
+				orderby << sw.OrderDown.GetString();
+			if(!sw.OrderUp.IsEmpty())
+			{
+				if(orderby.str().size()!=10)
+					orderby << ',';
+				orderby << sw.OrderUp.GetString();
+			}
+			sqlwhere += orderby.str().c_str();
+		}
+ 		return sqlwhere;
 	}
 	CAtlString BuildUsualWhere(const SIMPLEWHERES& sw)
 	{
@@ -428,6 +479,8 @@ namespace SqliteOpt{
 	Access::Access(HWND win)
 		:m_db(NULL),base::BackLogicBase(win)
  	{
+		m_offjournal = false;
+		m_shutdown = true;
 		m_opened = false;
 		m_init = false;
 		m_gnm = L"SqliteOptAccess";
@@ -442,9 +495,14 @@ namespace SqliteOpt{
 	{
 		if(m_db)
 		{
+			m_db->setAutoShutDown(m_shutdown);
 			delete m_db;
 			m_db = NULL;
 		}
+	}
+	void Access::Shutdown(bool bv)
+	{
+		m_shutdown = bv;
 	}
 	void Access::Append(std::tr1::shared_ptr<Job> job)
 	{
@@ -556,6 +614,7 @@ namespace SqliteOpt{
 			br = true;
 		else
 			br = false;
+ 		m_error = m_db->lastMsg;
 		q.finalize();
 		return br;
 	}
@@ -570,6 +629,7 @@ namespace SqliteOpt{
 			if(_tccmp(q.getStringField(_T("integrity_check")),_T("ok"))==0)
 				blankDB = false;
 		}
+ 		m_error = m_db->lastMsg;
 		q.finalize();
 		return (!blankDB);
 	}
@@ -654,6 +714,10 @@ namespace SqliteOpt{
 			return m_db->ResetKeyDB(L"");
 		return false;
 	}
+	void Access::OffJournal()
+	{
+		m_offjournal = true;
+	}
 	bool Access::Open(CAtlString file,CSQLiteTool* driver)
 	{
 		CLockGuard guard(&m_lkDBFILE);
@@ -662,7 +726,9 @@ namespace SqliteOpt{
 		if(m_init==false)
 		{
 			m_db = new CppSQLite3DBU(driver);
- 			m_init = true;
+			if(m_offjournal)
+				m_db->execQuery(_T("PRAGMA journal_mode=OFF;"));
+			m_init = true;
 		}
 		bool bRet = false;
 		if(m_dbfile.CompareNoCase(file)!=0 && m_db)
@@ -676,6 +742,10 @@ namespace SqliteOpt{
 				bRet = m_db->EncryptDB(file,m_pwd);
 			else
 				bRet = m_db->open(file);
+			if(bRet==false)
+			{
+ 				m_error = m_db->lastMsg;
+			}
 			m_opened = bRet;
 			if(m_opened && fExist && CheckCrypt())
 				return false;
@@ -708,6 +778,8 @@ namespace SqliteOpt{
 		{
 			m_db = new CppSQLite3DBU(NULL);
 			m_db->GetSqlTool()->Initialize((char*)CT2CA(driver));
+			if(m_offjournal)
+				m_db->execQuery(_T("PRAGMA journal_mode=OFF;"));
 			m_init = true;
 		}
 		bool bRet = false;
@@ -756,5 +828,11 @@ namespace SqliteOpt{
 	void Access::SetNsrsh(CAtlString nsrsh)
 	{
 		m_nsrsh = nsrsh;
+	}
+	bool Access::Reopen()
+	{
+		if(m_opened)
+			m_db->close();
+		return Open(m_dbfile, NULL);
 	}
 };

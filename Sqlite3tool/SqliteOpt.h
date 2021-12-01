@@ -234,6 +234,19 @@ namespace SqliteOpt{
 		bool like;	//是否模糊
 		bool bIN;	//范围搜索
 	};
+	 
+	class SIMPLEWHERES : public std::vector<SimpleWhere>
+	{
+	public:
+		SIMPLEWHERES(){	}
+		void assign(const SIMPLEWHERES& val){
+			__super::assign(val.begin(),val.end());
+			OrderUp = val.OrderUp;
+			OrderDown = val.OrderDown;
+		}
+		CAtlString OrderUp;
+		CAtlString OrderDown;
+	};
 	//用于对where数据进行重构处理
 	class ReWhereX
 	{
@@ -252,8 +265,7 @@ namespace SqliteOpt{
  			return L""; 
 		}
 	};
-	typedef std::vector<SimpleWhere> SIMPLEWHERES;
-	/*
+ 	/*
 		生成常用where语句
 		@inParam
 			sw where结构体
@@ -341,6 +353,7 @@ namespace SqliteOpt{
 		virtual ~Access();
 		void SetNoAsync();
 		CAtlString GetFileDB();
+		void OffJournal();
 		void TestNoPwd(CAtlString file,CSQLiteTool* driver);
 		void UsePwd(CAtlString pwd);
 		void SetBackupDB(CAtlString backfile);
@@ -358,6 +371,8 @@ namespace SqliteOpt{
 		void StartWAL();
 		void SetNsrsh(CAtlString nsrsh);
 		bool CheckCrypt();
+		bool Reopen();
+		void Shutdown(bool bv);
 	protected:
 		void* Query(LPCTSTR pClass)
 		{
@@ -387,5 +402,7 @@ namespace SqliteOpt{
 		bool m_opened;	//数据库打开状态
 		bool m_init;	//数据库初始状态
 		bool m_noasync;	//同步异步标记
+		bool m_shutdown; //自动释放sqlite
+		bool m_offjournal;
 	};
 };

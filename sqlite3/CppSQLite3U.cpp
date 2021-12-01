@@ -104,7 +104,7 @@ CppSQLite3ExceptionU::~CppSQLite3ExceptionU()
 CppSQLite3DBU::CppSQLite3DBU(CSQLiteTool *sqlTool)
 {
 	mpDB = 0;
-	mnBusyTimeoutMs = 60000; // 60 seconds
+	mnBusyTimeoutMs = 720000; // 60 seconds
 	mpVM = NULL;
 	autoShutDown = true;
 	mynewtool = false;
@@ -120,7 +120,7 @@ CppSQLite3DBU::CppSQLite3DBU(CSQLiteTool *sqlTool)
 CppSQLite3DBU::CppSQLite3DBU(const CppSQLite3DBU& db)
 {
 	mpDB = db.mpDB;
-	mnBusyTimeoutMs = 60000; // 60 seconds
+	mnBusyTimeoutMs = 720000; // 60 seconds
 	mpVM=NULL;
 	autoShutDown = false;
 	mSqlTool = new CSQLiteTool;
@@ -145,7 +145,7 @@ CppSQLite3DBU::~CppSQLite3DBU()
 CppSQLite3DBU& CppSQLite3DBU::operator=(const CppSQLite3DBU& db)
 {
 	mpDB = db.mpDB;
-	mnBusyTimeoutMs = 60000; // 60 seconds
+	mnBusyTimeoutMs = 720000; // 60 seconds
 	return *this;
 }
 
@@ -153,7 +153,7 @@ bool CppSQLite3DBU::open(LPCTSTR szFile)
 {
 	if(mSqlTool==NULL)
 		return false;
-    int nRet = mSqlTool->OpenDB(CT2CA(szFile,CP_UTF8), &mpDB); 
+    int nRet = mSqlTool->OpenDB16(szFile, &mpDB); 
 	if (nRet != SQLITE_OK)
 	{
 		GetLastMsg();
