@@ -93,6 +93,8 @@ bool CopyDirByFilter(const CString& dir, const CString& dst,DirFilter *fun);
 
 bool CopyDir(const CAtlString& dir, const CAtlString& dst,DirFilter *fun);
 
+bool ShCopyDir(const CAtlString& dir, const CAtlString& dst);
+
 bool MoveDir(const CAtlString& dir, const CAtlString& dst);
 
 DWORD CountDirFiles(const CAtlString& dir);

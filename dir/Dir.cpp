@@ -181,6 +181,32 @@ DWORD 	EnumFloderItem(LPCTSTR lpRoot,DWORD dwAttributes,
 	return 0;
 }
 /*------------------------------------------------------------------------*/
+bool ShCopyDir(const CAtlString& dir, const CAtlString& dst)
+{
+	if(!IsPathFind(dir))
+		return false;
+	CheckDir(dst,TRUE,NULL);
+	SHFILEOPSTRUCT  shDelFile;
+	memset(&shDelFile, 0, sizeof(SHFILEOPSTRUCT));
+	shDelFile.fFlags |= FOF_SILENT;				//不显示进度
+	shDelFile.fFlags |= FOF_NOERRORUI;			//不报告错误信息
+	shDelFile.fFlags |= FOF_NOCONFIRMATION;		//直接删除，不进行确认
+	// 复制路径到一个以双NULL结束的string变量里
+	TCHAR from[_MAX_PATH + 1];
+	TCHAR to[_MAX_PATH + 1];	
+	_tcscpy_s(from,_MAX_PATH,dir);				// 复制路径
+	from[_tcslen(from) + 1] = 0;		// 在末尾加两个NULL
+
+	_tcscpy_s(to,_MAX_PATH,dst);				// 复制路径
+	to[_tcslen(to) + 1] = 0;		// 在末尾加两个NULL
+	// 设置SHFILEOPSTRUCT的参数为删除做准备
+	shDelFile.wFunc = FO_COPY;	// 执行的操作
+	shDelFile.pFrom = from;
+	shDelFile.pTo = to;
+	shDelFile.fFlags &= ~FOF_ALLOWUNDO;		//直接删除，不进入回收站
+	return SHFileOperation(&shDelFile) == 0;
+}
+
 DWORD  CheckDir( LPCTSTR pDir,BOOL bCreate,LPSECURITY_ATTRIBUTES lpSecurity)
 {
 	DWORD dwRet = 0;	
@@ -423,6 +449,8 @@ CString GetProcessFullName(HANDLE h) {
 /*---------------------------------------------------------------------------------------------*/
 bool DeleteDir(const CAtlString &dir)
 {
+	if(!IsPathFind(dir))
+		return true;
 	SHFILEOPSTRUCT  shDelFile;
 	memset(&shDelFile, 0, sizeof(SHFILEOPSTRUCT));
 	shDelFile.fFlags |= FOF_SILENT;				//不显示进度
