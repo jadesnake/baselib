@@ -4,6 +4,16 @@
 #include <Shellapi.h>
 #pragma comment(lib,"Shell32.lib")
 namespace base{
+	std::string MakeLower(std::string& val)
+	{
+		std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+		return val;
+	}
+	std::string MakeUpper(std::string& val)
+	{
+		std::transform(val.begin(), val.end(), val.begin(), ::toupper);
+		return val;
+	}
 	//-------------------------------------------------------------------------------------------------
 	int IsTextGBK(const std::string& txt)
 	{

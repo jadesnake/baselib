@@ -1,4 +1,4 @@
-﻿#include "stdafx.h"
+�?#include "stdafx.h"
 #include "WinUtil.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -195,7 +195,7 @@ namespace base	{
 			if(!CmdImportCert(certfile))
 			{
 				CAtlString   strErr;
-				strErr.Format(_T("证书导入失败,请手动安装 0x%x \n"),GetLastError());
+				strErr.Format(_T("证书导入失败,请手动安�? 0x%x \n"),GetLastError());
 				MessageBox(NULL,strErr,NULL,0);
 				return false;
 			}
@@ -502,7 +502,7 @@ namespace base	{
 			::CloseHandle(hMutex);
 			return false;
 		}
-		/* 从此这个互斥信号量就被不受控地打开了，直到进程退出 */
+		/* 从此这个互斥信号量就被不受控地打开了，直到进程退�? */
 		return true;
 	}
 
@@ -594,35 +594,35 @@ namespace base	{
 	}
 
 	//////////////////////////////////////  
-	// 功能：获取适配器特性  
-	// 参数：   
-	//   adapter_name 适配器 ID  
-	// 返回值：成功则返回由参数指定的适配器的特性标志，是一个 DWORD 值，失败返回 0  
+	// 功能：获取适配器特�?  
+	// 参数�?   
+	//   adapter_name 适配�? ID  
+	// 返回值：成功则返回由参数指定的适配器的特性标志，是一�? DWORD 值，失败返回 0  
 	//  
 	UINT GetAdapterCharacteristics(char* adapter_name)  
 	{  
 		if(adapter_name == NULL || adapter_name[0] == 0)  
 			return 0;  
 		HKEY root = NULL;  
-		// 打开存储适配器信息的注册表根键  
+		// 打开存储适配器信息的注册表根�?  
 		if(ERROR_SUCCESS != RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}", 0, KEY_READ, &root))  
 			return 0;  
 		DWORD subkeys = 0;  
-		// 获取该键下的子键数  
+		// 获取该键下的子键�?  
 		if(ERROR_SUCCESS != RegQueryInfoKeyA(root, NULL, NULL, NULL, &subkeys, NULL, NULL, NULL, NULL, NULL, NULL, NULL))  
 			subkeys = 100;  
 		DWORD ret_value = 0;  
 		for(DWORD i = 0; i < subkeys; i++)  
 		{  
-			// 每个适配器用一个子键存储，子键名为从 0 开始的 4 位数  
+			// 每个适配器用一个子键存储，子键名为�? 0 开始的 4 位数  
 			char subkey[512];  
 			memset(subkey, 0, 512);  
 			StringCbPrintfA(subkey, 512, "%04u", i);  
-			// 打开该子键  
+			// 打开该子�?  
 			HKEY hKey = NULL;  
 			if(ERROR_SUCCESS != RegOpenKeyExA(root, subkey, 0, KEY_READ, &hKey))  
 				continue;  
-			// 获取该子键对应的适配器 ID，存于 name 中  
+			// 获取该子键对应的适配�? ID，存�? name �?  
 			char name[MAX_PATH];  
 			DWORD type = 0;  
 			DWORD size = MAX_PATH;  
@@ -631,13 +631,13 @@ namespace base	{
 				RegCloseKey(hKey);  
 				continue;  
 			}  
-			// 对比该适配器 ID 是不是要获取特性的适配器 ID  
+			// 对比该适配�? ID 是不是要获取特性的适配�? ID  
 			if(StrCmpIA(name, adapter_name) != 0)  
 			{  
 				RegCloseKey(hKey);  
 				continue;
 			}  
-			// 读取该适配器的特性标志，该标志存储于值 Characteristics 中  
+			// 读取该适配器的特性标志，该标志存储于�? Characteristics �?  
 			DWORD val = 0;  
 			size = 4;  
 			LSTATUS ls = RegQueryValueExA(hKey, "Characteristics", NULL, &type, (LPBYTE)&val, &size);  
@@ -652,10 +652,10 @@ namespace base	{
 		return ret_value;  
 	}  
 	//////////////////////////////////////  
-	// 功能：获取 Mac 地址的二进制数据  
-	// 参数：  
+	// 功能：获�? Mac 地址的二进制数据  
+	// 参数�?  
 	//   mac 用于输出 Mac 地址的二进制数据的缓冲区指针  
-	// 返回值：成功返回 mac 地址的长度，失败返回 0，失败时 mac 中保存一些简单的错误信息，可适当修改，用于调试  
+	// 返回值：成功返回 mac 地址的长度，失败返回 0，失败时 mac 中保存一些简单的错误信息，可适当修改，用于调�?  
 	//  
 	void GetMacAddress(std::string &out)  
 	{  
@@ -883,13 +883,10 @@ namespace base	{
 	{
 		bool bRet = false;
 		bool cmpFullDir = false;
-		CAtlString cmpName(szProcessName);
-		cmpName = cmpName.Trim();
-		cmpName.Replace('/','\\');
-		if(-1!=cmpName.Find(_T(":\\")))
-			cmpFullDir=true;	//按全路径比较
-		if(szProcessName.IsEmpty())
-			return false;
+		if(-1!=szProcessName.Find(_T(":\\")))
+			cmpFullDir=true;	//��ȫ·���Ƚ�	
+		CAtlString exeName = szProcessName;
+		exeName = exeName.MakeLower();
 		PROCESSENTRY32 processEntry32;   
 		HANDLE toolHelp32Snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,  0);  
 		if(((int)toolHelp32Snapshot) != -1)  
@@ -899,32 +896,32 @@ namespace base	{
 			{  
 				do
 				{
-					if(cmpFullDir)
+					CAtlString exefile(processEntry32.szExeFile);
+					exefile = exefile.MakeLower();
+					if(exeName.Find(exefile)!=-1)
 					{
-						TCHAR chPath[MAX_PATH] = { 0 };
-						HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ|SYNCHRONIZE,FALSE,processEntry32.th32ProcessID);
-						if(handle){
-							::GetModuleFileNameEx(handle,NULL,chPath,MAX_PATH);
-							CAtlString tmpPath(chPath);
-							tmpPath.Replace('/','\\');
-							
-							if(tmpPath.CompareNoCase(cmpName)==0)
+						HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|PROCESS_QUERY_INFORMATION|PROCESS_VM_READ,FALSE,processEntry32.th32ProcessID);
+						if(handle)
+						{
+							if(cmpFullDir)
+							{
+								TCHAR chPath[MAX_PATH] = { 0 };
+								::GetModuleFileNameEx(handle,NULL,chPath,MAX_PATH);
+								if(szProcessName.CompareNoCase(chPath)==0)
+								{
+									::TerminateProcess(handle,0xdead);
+									::WaitForSingleObject(handle,INFINITE);
+									::CloseHandle(handle);
+									bRet = true; 
+								}
+							}
+							else
 							{
 								::TerminateProcess(handle,0xdead);
+								::WaitForSingleObject(handle,INFINITE);
 								::CloseHandle(handle);
-								bRet = true; 
-								break;
+								bRet = true;
 							}
-							::CloseHandle(handle);
-						}
-					}
-					else if(0==szProcessName.CompareNoCase(processEntry32.szExeFile))
-					{
-						HANDLE handle = ::OpenProcess(PROCESS_TERMINATE|SYNCHRONIZE,FALSE,processEntry32.th32ProcessID);
-						if(handle){
-							::TerminateProcess(handle,0xdead);
-							::CloseHandle(handle);
-							bRet = true;
 						}
 						break;
 					}  
@@ -934,6 +931,7 @@ namespace base	{
 		}
 		return bRet;
 	}
+	
 	bool IsExistProcess(const CAtlString& szProcessName,HANDLE *process)
 	{
 		bool bRet = false;
@@ -991,7 +989,7 @@ namespace base	{
 		LRESULT lr;
 		HKEY hKey;
 		lr = ::RegOpenKey(hParent, szKey, &hKey);
-		//不能打开注册表
+		//不能打开注册�?
 		if(lr != ERROR_SUCCESS)
 		{		 
 			return ret;
@@ -1049,7 +1047,7 @@ namespace base	{
 		case REG_DWORD:
 			{
 				DWORD dwData = 0;
-				//获取注册表中指定的键所对应的值
+				//获取注册表中指定的键所对应的�?
 				if(ERROR_SUCCESS == ::RegQueryValueEx(hKey,strKey, 0, &dwDataType,(LPBYTE)&dwData, &dwSize))
 				{
 					strValue.Format(_T("%d"),dwData);
@@ -1060,7 +1058,7 @@ namespace base	{
 			{
 				//分配内存大小
 				BYTE* lpValue = new BYTE[dwSize];
-				//获取注册表中指定的键所对应的值
+				//获取注册表中指定的键所对应的�?
 				if(ERROR_SUCCESS == ::RegQueryValueEx(hKey,strKey, 0, &dwDataType, lpValue, &dwSize))
 				{
 					strValue = lpValue;
@@ -1073,7 +1071,7 @@ namespace base	{
 				//分配内存大小
 				wchar_t* lpValue = new wchar_t[dwSize];
 				memset(lpValue, 0, dwSize * sizeof(wchar_t));
-				//获取注册表中指定的键所对应的值
+				//获取注册表中指定的键所对应的�?
 				if (ERROR_SUCCESS == ::RegQueryValueEx(hKey,strKey, 0, &dwDataType, (LPBYTE)lpValue, &dwSize))
 				{
 					strValue = CW2CT(lpValue);

@@ -183,8 +183,6 @@ DWORD 	EnumFloderItem(LPCTSTR lpRoot,DWORD dwAttributes,
 /*------------------------------------------------------------------------*/
 bool ShCopyDir(const CAtlString& dir, const CAtlString& dst)
 {
-	if(!IsPathFind(dir))
-		return false;
 	CheckDir(dst,TRUE,NULL);
 	SHFILEOPSTRUCT  shDelFile;
 	memset(&shDelFile, 0, sizeof(SHFILEOPSTRUCT));

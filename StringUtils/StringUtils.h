@@ -1,5 +1,6 @@
 #pragma once
 
+#include <xstring>
 #include <string>
 #include <vector>
 #include <map>
@@ -21,7 +22,9 @@ namespace base{
 	std::map<std::string,std::string> ParseUrlGetParams(const char* url);
 	
 	void Replace(std::string &strBase,std::string strSrc,std::string strDes);
- 
+	std::string MakeLower(std::string& val);
+	std::string MakeUpper(std::string& val);
+
 	template<class _STR>
 	void SetVecOrder(std::vector<_STR> &ret,bool bLarger=true)
 	{
