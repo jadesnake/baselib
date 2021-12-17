@@ -1,4 +1,4 @@
-ï»?#include "stdafx.h"
+#include "stdafx.h"
 #include "WinUtil.h"
 #include <assert.h>
 #include <stdlib.h>

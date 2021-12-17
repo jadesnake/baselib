@@ -289,12 +289,18 @@ NamedPipe* NamedPipe::WaitClient(unsigned int timeout)
 		int result = WaitForSingleObject(lpOverlapped.hEvent,timeout);
 		if(lpOverlapped.hEvent)
 			CloseHandle(lpOverlapped.hEvent);
+		if(WAIT_TIMEOUT==result && IsAlive())
+		{
+			mLastMsg = L"AsyncWaitForConnection timeout";
+			return NULL;
+		}
 		if(WAIT_OBJECT_0==result && IsAlive())
 		{
 			HANDLE client = mPipe;
 			open(mNamed);
 			return new NamedPipe(client);
 		}
+
 		return NULL;
 	}
 	mLastMsg = L"AsyncWaitForConnection failed";
