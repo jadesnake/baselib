@@ -195,6 +195,7 @@ namespace SqliteOpt{
 			level = 0;
 			like = false;
 			bIN = false;
+			bRange = false;
 			likeOrder = L"full";
 		}
 		SimpleWhere(size_t l,CAtlString k,CAtlString v,bool b){
@@ -203,6 +204,7 @@ namespace SqliteOpt{
 			val = v;
 			like =b;
 			bIN = false;
+			bRange = false;
 			likeOrder = L"full";
 		}
 		SimpleWhere(size_t l,CAtlString k,char v,bool b){
@@ -211,6 +213,7 @@ namespace SqliteOpt{
 			val = v;
 			like =b;
 			bIN = false;
+			bRange = false;
 			likeOrder = L"full";
 		}
 		SimpleWhere(size_t l,CAtlString k,int v){
@@ -219,6 +222,7 @@ namespace SqliteOpt{
 			val.Format(L"%d",v);
 			like = false;
 			bIN = false;
+			bRange = false;
 			likeOrder = L"full";
 			type = L"int";
 		}
@@ -229,10 +233,12 @@ namespace SqliteOpt{
 		size_t level;	//级别
 		CAtlString key;	//搜索关键字
 		CAtlString val;	//搜索值
+		CAtlString val2; //范围值
 		CAtlString likeOrder; //匹配规则
 		CAtlString type; //val类型
 		bool like;	//是否模糊
 		bool bIN;	//范围搜索
+		bool bRange; //between
 	};
 	 
 	class SIMPLEWHERES : public std::vector<SimpleWhere>

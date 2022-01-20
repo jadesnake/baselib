@@ -210,6 +210,7 @@ namespace SqliteOpt{
 				one.level = JsonUtils::SafeJsonValueINT(jvWhere[t],"level");
 				one.like = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"like");
 				one.bIN = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"in");
+				one.bRange = JsonUtils::SafeJsonValueBOOL(jvWhere[t],"range");
 				one.likeOrder = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"likeOrder").c_str(),CP_UTF8);
 				if(jvWhere[t].isMember("value"))
 				{
@@ -222,6 +223,15 @@ namespace SqliteOpt{
 					else if(jvWhere[t]["value"].isBool())
 						one.type = L"bool";
 				}
+				if(one.bRange && jvWhere[t].isMember("value2") && (one.type==L"str" || one.type==L"int"))
+				{
+					if(jvWhere[t]["value2"].isString())
+ 						one.val2 = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"value2").c_str(),CP_UTF8);
+ 					else if(jvWhere[t]["value2"].isInt() || jvWhere[t]["value2"].isUInt() || jvWhere[t]["value2"].isIntegral())
+ 						one.val2 = (TCHAR*)CA2CT(JsonUtils::SafeJsonValue(jvWhere[t],"value2").c_str(),CP_UTF8);
+ 				}
+				if(one.bRange && one.val2.IsEmpty())
+					one.bRange = false;
 				sw.push_back(one);
 			}
 		}
@@ -356,7 +366,15 @@ namespace SqliteOpt{
 			}
 			else
 			{
-				if(it->second.bIN)
+				if(it->second.bRange)
+				{
+					wss<<L" "<<it->second.key.GetString()<<L" BETWEEN ";
+					if(it->second.type==L"str" || it->second.type.IsEmpty())
+  						wss<<L"'"<<it->second.val.GetString()<<L"' AND '"<<it->second.val2.GetString()<<L"'";
+ 					else
+						wss<<L""<<it->second.val.GetString()<<L" AND "<<it->second.val2.GetString()<<L"";
+				}
+				else if(it->second.bIN)
 				{
 					wss<<L" "<<it->second.key.GetString();
 					wss<<L" in ("<<it->second.val.GetString()<<L")";
