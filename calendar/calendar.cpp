@@ -47,12 +47,6 @@ namespace base
 	{
 		return Calendar::GetMonthDays(ATL::CTime::GetYear(), ATL::CTime::GetMonth());
 	}
-
-	int Calendar::GetMonthDays(const ATL::CAtlString strTime){
-      SYSTEMTIME svrDateTime = ParseDateTime(CT2CA(strTime).m_psz,"yyyy-MM");
-      return Calendar::GetMonthDays(svrDateTime.wYear,svrDateTime.wMonth);
-	}
-
 	int Calendar::GetMonthDays(int y,int m)
 	{
 		int nRet = 0;
@@ -76,7 +70,7 @@ namespace base
 		if (m == 1 || m == 2) {
 			m += 12;
 			y--;
-		} 
+		}
 		int iWeek = (d + 2 * m + 3 * (m + 1) / 5 + y + y / 4 - y / 100 + y / 400) % 7;
 		iWeek += 1;	//0 -- 周一；7 -- 星期日
 		return iWeek;
@@ -192,6 +186,89 @@ namespace base
 			return true;
 		}
 		return false;
+	}
+	std::string Calendar::FormatDateTime(const SYSTEMTIME systm,const std::string& fmt)
+	{
+		time_t curTM = time(0);
+		struct tm tmNow = *localtime(&curTM);
+		std::stringstream rRet;
+		std::string curYear,curMonth,curDay,curHour,curMin,curSec;
+		{
+			std::stringstream ss;
+			ss << systm.wYear;
+			curYear = ss.str();
+		}
+		{
+			std::stringstream ss;
+			ss << systm.wMonth;
+			curMonth = ss.str();
+		}
+		{
+			std::stringstream ss;
+			ss << systm.wDay;
+			curDay = ss.str();
+		}
+		{
+			std::stringstream ss;
+			ss << systm.wHour;
+			curHour = ss.str();
+		}
+		{
+			std::stringstream ss;
+			ss << systm.wMinute;
+			curMin = ss.str();
+		}
+		{
+			std::stringstream ss;
+			ss << systm.wSecond;
+			curSec = ss.str();
+		}
+ 		std::string *pVal = 0;
+		std::string temp;
+		for(size_t t=0;t<=fmt.size();t++)
+		{
+			char f = fmt[t];
+			if(t && f!=fmt[t-1])
+			{
+				if(fmt[t-1]=='y')
+					pVal = &curYear;
+				else if(fmt[t-1]=='M')
+					pVal = &curMonth;
+				else if(fmt[t-1]=='d')
+					pVal = &curDay;
+				else if(fmt[t-1]=='h')
+					pVal = &curHour;
+				else if(fmt[t-1]=='m')
+					pVal = &curMin;
+				else if(fmt[t-1]=='s')
+					pVal = &curSec;
+				else
+				{
+					temp += f;
+					continue;
+				}
+				int cz = (int)temp.size()-(int)pVal->size();
+				if(cz>=0)
+				{	//补0
+					for(int n=0;n<cz;n++)
+						rRet << "0";
+					rRet << pVal->c_str();
+				}
+				else
+				{
+					for(int n=pVal->size()+cz;n<pVal->size();n++)
+						rRet << pVal->at(n);
+				}
+				temp = "";
+				if(f==' ' || f=='-' || f==':')
+					rRet << f;
+				else
+					temp += f;
+				continue;
+			}
+			temp += f;
+		}
+		return rRet.str();
 	}
 	SYSTEMTIME Calendar::ParseDateTime(const std::string& dt,const std::string& temp)
 	{
