@@ -254,7 +254,6 @@ void GetFileListFromDir_internal(CAtlString path, BOOL recursive, OUT CSimpleArr
 {
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
-
 	CAtlString spec = path + _T("\\*");
 	hFind = FindFirstFile(spec, &FindFileData);
 	if (hFind != INVALID_HANDLE_VALUE) 
@@ -264,11 +263,14 @@ void GetFileListFromDir_internal(CAtlString path, BOOL recursive, OUT CSimpleArr
 			CAtlString fileName = FindFileData.cFileName;
 			if (FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
 			{
-				if (recursive && fileName != _T(".") && fileName != _T(".."))
+				if (fileName != _T(".") && fileName != _T(".."))
 				{
 					TCHAR full[MAX_PATH];
 					PathCombine(full, path, fileName);
-					GetFileListFromDir_internal(full, recursive, ay);
+					if(recursive)
+						GetFileListFromDir_internal(full, recursive, ay);
+					else
+						ay.Add(full);
 				}
 			}
 			else
@@ -279,7 +281,6 @@ void GetFileListFromDir_internal(CAtlString path, BOOL recursive, OUT CSimpleArr
 			}
 
 		} while (FindNextFile(hFind, &FindFileData));
-
 		FindClose(hFind);
 	}
 }
@@ -287,9 +288,7 @@ void GetFileListFromDir_internal(CAtlString path, BOOL recursive, OUT CSimpleArr
 CSimpleArray<CAtlString> GetFileListFromDir(CAtlString path, BOOL recursive)
 {
 	CSimpleArray<CAtlString> ay;
-
 	GetFileListFromDir_internal(path, recursive, ay);
-
 	return ay;
 }
 
@@ -339,6 +338,17 @@ BOOL IsPathFind( const CAtlString& strPath )
 {
 	return (GetFileAttributes(strPath) != INVALID_FILE_ATTRIBUTES);
 }
+CAtlString GetSysDirver()
+{
+	CAtlString sysDriver,ret;
+	sysDriver.GetBufferSetLength(32767);
+	GetSystemDirectory(sysDriver.GetBuffer(), sysDriver.GetAllocLength());
+	sysDriver = sysDriver.Mid(0,3).MakeUpper();
+	ret = sysDriver;
+	sysDriver.ReleaseBuffer();
+	return ret;
+}
+
 CAtlString FindFrontPath(const CAtlString& path)
 {
 	CAtlString rEmpty(path);
@@ -447,23 +457,46 @@ CString GetProcessFullName(HANDLE h) {
 /*---------------------------------------------------------------------------------------------*/
 bool DeleteDir(const CAtlString &dir)
 {
-	if(!IsPathFind(dir))
-		return true;
-	SHFILEOPSTRUCT  shDelFile;
-	memset(&shDelFile, 0, sizeof(SHFILEOPSTRUCT));
-	shDelFile.fFlags |= FOF_SILENT;				//不显示进度
-	shDelFile.fFlags |= FOF_NOERRORUI;			//不报告错误信息
-	shDelFile.fFlags |= FOF_NOCONFIRMATION;		//直接删除，不进行确认
-	// 复制路径到一个以双NULL结束的string变量里
-	TCHAR buf[_MAX_PATH + 1];
-	_tcscpy_s(buf,_MAX_PATH,dir);				// 复制路径
-	buf[_tcslen(buf) + 1] = 0;		// 在末尾加两个NULL
-	// 设置SHFILEOPSTRUCT的参数为删除做准备
-	shDelFile.wFunc = FO_DELETE;	// 执行的操作
-	shDelFile.pFrom = buf;			// 操作的对象，也就是目录
-	shDelFile.pTo = NULL;			// 必须设置为NULL
-	shDelFile.fFlags &= ~FOF_ALLOWUNDO;		//直接删除，不进入回收站
-	return SHFileOperation(&shDelFile) == 0;
+	 return RawDeleteDir(dir);
+}
+bool RawDeleteDir(const CAtlString &dir)
+{
+	CAtlString rawDir(dir);
+	if(rawDir.GetLength()==0) return true;
+	DWORD dwFileAttrs = GetFileAttributes(rawDir);
+	if(rawDir.ReverseFind('*')==-1)
+	{
+		if(dwFileAttrs==INVALID_FILE_ATTRIBUTES)
+			return false;
+		else if((dwFileAttrs&FILE_ATTRIBUTE_DIRECTORY)==FILE_ATTRIBUTE_DIRECTORY)
+			rawDir = AppendUrl(rawDir,L"*");
+		else
+			return (::DeleteFile(dir)?true:false);
+	}
+	WIN32_FIND_DATA	pData = { 0 };
+	HANDLE hFind = INVALID_HANDLE_VALUE;
+	hFind = ::FindFirstFile(rawDir, &pData);
+	if (hFind == INVALID_HANDLE_VALUE)	return false;
+	do
+	{
+		CAtlString name = pData.cFileName;
+		CAtlString srcF, tarF;
+		if (name == '.' || name == _T("..")) {
+ 			continue;
+		}
+		bool subRet = false;
+		if ((pData.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
+			RawDeleteDir(AppendUrl(dir,name));
+		else
+			::DeleteFile(AppendUrl(dir,name));
+	} while (FindNextFile(hFind, &pData));
+	::FindClose(hFind);
+	if(dir.GetAt(dir.GetLength()-1)!='\\')
+	{
+		rawDir = dir;
+		rawDir += '\\';
+	}
+	return (::RemoveDirectory(rawDir)?true:false);
 }
 /*---------------------------------------------------------------------------------------------*/
 CAtlString AppendUrl(const CAtlString& a, const CAtlString& b)
@@ -552,6 +585,12 @@ CAtlString GetFullAppName()
  	GetModuleFileName( NULL, sFilename, _MAX_PATH);
 	return (CAtlString)sFilename;
 }
+CAtlString GetCurDriver()
+{
+	CAtlString ret = GetAppPath();
+	ret = ret.Mid(0,3).MakeUpper();
+	return ret;
+}
 /*-----------------------------------------------------------------------------------------------*/
 bool MoveFileInernal(const CAtlString& a, const CAtlString& b)
 {
@@ -582,9 +621,18 @@ bool	CopyDir(const CAtlString& dir, const CAtlString& dst,DirFilter *fun)
 	HANDLE hFind = INVALID_HANDLE_VALUE;
 	CAtlString a;
 	//文件移动使用move
-	if (dir.IsEmpty())
-		return false;
-	a = AppendUrl(dir, _T("*.*"));
+	if (dir.IsEmpty())	return false;
+	CAtlString src;
+	if(dir.ReverseFind('*')==-1)
+	{
+		src = dir;
+		a = AppendUrl(dir, _T("*.*"));
+	}
+	else
+	{
+		src = FindFilePath(dir);
+		a = dir;
+	}
 	hFind = ::FindFirstFile(a, &pData);
 	if (hFind == INVALID_HANDLE_VALUE)
 		return false;
@@ -603,12 +651,12 @@ bool	CopyDir(const CAtlString& dir, const CAtlString& dst,DirFilter *fun)
 		bool subRet = false;
 		if ((pData.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
 		{
-			srcF = AppendUrl(dir, name);
+			srcF = AppendUrl(src, name);
 			tarF = AppendUrl(dst, name);
 			subRet = CopyDir(srcF, tarF, fun);
 		}
 		else {
-			srcF = AppendUrl(dir, name);
+			srcF = AppendUrl(src, name);
 			tarF = AppendUrl(dst, name);
 			subRet = CopyFileInernal(srcF, tarF);
 			if (subRet&&fun)
@@ -897,12 +945,12 @@ bool CreateFileShortcut(LPCWSTR lpszSaveTo,const Shortcut &inInfo)
 	return SUCCEEDED(hr);
 }
 /*---------------------------------------------------------------------------------------------*/
-double GetDriveFreeGB(LPSTR drive)
+double GetDriveFreeGB(CAtlString drive)
 {
 	DWORDLONG i64FreeBytesToCaller = 0;
 	DWORDLONG i64TotalBytes = 0;
 	DWORDLONG i64FreeBytes = 0;
-	GetDiskFreeSpaceExA(drive, (PULARGE_INTEGER)&i64FreeBytesToCaller,  
+	GetDiskFreeSpaceEx(drive, (PULARGE_INTEGER)&i64FreeBytesToCaller,  
 		(PULARGE_INTEGER)&i64TotalBytes, (PULARGE_INTEGER)&i64FreeBytes);
 	double dFreeGBs=0;
 	dFreeGBs = i64FreeBytes*9.3132e-10;
@@ -958,7 +1006,7 @@ CAtlString GetMaxBetysDrive(CAtlString badRoot)
 			CAtlString str ;
 			double dTemp = 0.00;
 			str = lpDriveStr;
-			dTemp = GetDriveFreeGB((char*)CT2CA(str));
+			dTemp = GetDriveFreeGB(str);
 			if(dTemp>dMax)
 			{
 				dMax = dTemp;

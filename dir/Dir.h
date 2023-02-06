@@ -73,6 +73,9 @@ CString GetProcessFullName(HANDLE h);
 //删除文件夹
 bool DeleteDir(const CAtlString &dir);
 
+//使用文件api删除文件夹
+bool RawDeleteDir(const CAtlString &dir);
+
 //追加路径
 CAtlString AppendUrl(const CAtlString& a, const CAtlString& b);
 
@@ -86,6 +89,10 @@ CAtlString FindFilePath(const CAtlString& path);
 CAtlString GetAppName();
 //获取全路径
 CAtlString GetFullAppName();
+//获取当前驱动器
+CAtlString GetCurDriver();
+//获取系统驱动器
+CAtlString GetSysDirver();
 
 CAtlString FindFrontPath(const CAtlString& path);
 
@@ -143,3 +150,5 @@ bool ResetShortcut(LPCWSTR lnkfile,Shortcut &outInfo);
 CAtlString GetMaxBetysDrive(CAtlString badRoot);
 
 bool IsWriterPath(const CAtlString &fullpath);
+
+double GetDriveFreeGB(CAtlString drive);
